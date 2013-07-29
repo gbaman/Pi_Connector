@@ -2,24 +2,60 @@ import os, socket, json
 from time import sleep
 
 def clearer():
+    #Simple function that clears the screen
     os.system('cls' if os.name=='nt' else 'clear')
 
-def grablist():
-    message = 'RequestList'
-    host = 'localhost'
-    port = 50000
-    size = 1024
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((host,port))
-    s.send(message)
-    data = s.recv(size)
-    data = json.loads(data)
-    s.close()
-    #print(data)
-    return data
+
+def startupimage2():
+    clearer()
+    #Everyone loves awesome ASCII art!
+    print('''
+
+   _____ _          _                       
+  / ____| |        (_)                          .~~.   .~~.
+ | (___ | |__  _ __ _ _ __ ___  _ __  _   _    '. \ ' ' / .'
+  \___ \| '_ \| '__| | '_ ` _ \| '_ \| | | |    .~ .~~~..~. 
+  ____) | | | | |  | | | | | | | |_) | |_| |   : .~.'~'.~. :
+ |_____/|_| |_|_|  |_|_| |_| |_| .__/ \__, |  ~ (   ) (   ) ~ 
+                               | |     __/ | ( : '~'.~.'~' : )
+                               |_|    |___/   ~ .~ (   ) ~. ~
+                                               (  : '~' :  )
+                                                '~ .~~~. ~'
+                                                    '~'
+   _____            _             _ _           
+  / ____|          | |           | | |          
+ | |     ___  _ __ | |_ _ __ ___ | | | ___ _ __ 
+ | |    / _ \| '_ \| __| '__/ _ \| | |/ _ | '__|
+ | |___| (_) | | | | |_| | | (_) | | |  __| |   
+  \_____\___/|_| |_|\__|_|  \___/|_|_|\___|_| 
+
+    ''')
+    sleep(2)
+
+    
+
+def grablist(): #Job is to grab the list off the server of connected clients
+    gotdata = False
+    while gotdata == False: #Will loop till it gets reply from the server
+        try:
+            message = 'RequestList'
+            host = 'localhost' #Currently hardcoded that the server is on the same machine as the client
+            port = 50000
+            size = 1024
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((host,port))
+            s.send(message)
+            data = s.recv(size)
+            data = json.loads(data)
+            s.close()
+            gotdata = True
+            return data
+        except socket.error:
+            print('Can not find server, trying again')
+            sleep(2)
 
 def transmiter(message, ip):
-    port = 50007
+    port = 50008
     size = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     print((ip,port))
@@ -41,7 +77,8 @@ def ipmenu(ip):
         print('4. Assign a name')
         print('5. Flash LEDs on robot')
         print('6. Alive check')
-        print('7. Return to main menu')
+        print('7. Disable all GPIO')
+        print('8. Return to main menu')
 
 
         answer = raw_input()
@@ -56,12 +93,14 @@ def ipmenu(ip):
         elif answer == '4':
             print('Please enter name')
             name = raw_input()
-            message = name
+            message = 'name :' + name
         elif answer == '5':
             message = 'LED'
         elif answer == '6':
             message = 'Ping'
         elif answer == '7':
+            message = 'GPIOoff'
+        elif answer == '8':
             transmit = False
             #menu()
         else:
@@ -82,20 +121,39 @@ def menu(clientlist):
     print('Shrimpy classroom management text client')
     print('')
     print('1. Refresh')
+    print('2. Reboot all robots')
+    print('3. Shut down all robots')
+    print('4. Kill all GPIO pins')
+    print('')
+    print('Connected Raspberry Pis')
+    #print('')
     for clientnum in range(0, len(clientlist)):
-        print(str(clientnum + 2) + '. ' + clientlist[clientnum])
+        print(str(clientnum + 5) + '. ' + clientlist[clientnum])
     answer = raw_input()
 
 
     if answer == '1':
         clientlist = grablist()
-    elif (not(int(answer) == 1)) and ((int(answer) - 1) < (len(clientlist)+1)):
+    elif answer == '2':
+        for clientnum in range(0, len(clientlist)):
+          transmiter('Reboot', clientlist[clientnum])
+
+    elif answer == '3':
+        for clientnum in range(0, len(clientlist)):
+          transmiter('Shutdown', clientlist[clientnum])
+    elif answer == '4':
+        for clientnum in range(0, len(clientlist)):
+          print(clientnum)
+          print(clientlist[clientnum])
+          transmiter('GPIOoff', clientlist[clientnum])
+            
+    elif (not(int(answer) == 1)) and ((int(answer) - 4) < (len(clientlist)+1)):
         print('Valid')
-        ipmenu(clientlist[(int(answer) -2 )])
+        ipmenu(clientlist[(int(answer) -6 )])
 
 
     menu(clientlist)
 
-
+startupimage2()
 clientlist = grablist()
 menu(clientlist)

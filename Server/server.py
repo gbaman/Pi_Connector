@@ -16,30 +16,31 @@ def pinger(clientlist):
     todelete = []
     #clientlist = ['10.0.5.173','10.5.2.3']
     print('Starting pinger, list to ping = ' + str(clientlist))
-    #print(clientlist)
+    print(clientlist)
     for clientnum in range(0,len(clientlist)):
-        #print('Going round clientnum loop, on loop ' + str(clientnum))
+        print('Going round clientnum loop, on loop ' + str(clientnum))
         address = clientlist[clientnum]
 
-        #print('About to ping')
-        PORT = 50007              # The same port as used by the server
+        print('About to ping')
+        PORT = 50008             # The same port as used by the server
         s = socket(AF_INET, SOCK_STREAM)
         s.settimeout(0.1)
         try:
             
             s.connect((address, PORT))
             s.sendall('Ping')
-            #print('Sent, waiting for data')
+            print('Sent, waiting for data')
             data = s.recv(1024)
-            #print(data)
+            print(data)
                 
             
             s.close()
+            print('Socket closed')
 
         except error :
             print('Socket timed out')
             todelete.append(clientnum)
-            #print(clientlist)
+            print(clientlist)
 
     for delnum in range(0 ,len(todelete)+1):
         print(str(todelete))
@@ -57,7 +58,7 @@ def datachecker(clientlist):
         if data:
             if data == 'Register':
                 if not (address in clientlist):
-                    #print(address)
+                    print(address)
                     clientlist.append(str(address[0]))
                     print('Client at ' + str(address[0]) +' added to list')
                 client.send('Accept')
