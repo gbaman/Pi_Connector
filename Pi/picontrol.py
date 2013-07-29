@@ -5,7 +5,10 @@ from time import sleep
 from time import time
 from socket import *
 from subprocess import Popen, call
-import RPi.GPIO as GPIO
+try:
+    import RPi.GPIO as GPIO
+except ImportError:
+    print('Raspberry Pi GPIO library not found')
 
 
 def register(serverip):
@@ -34,8 +37,8 @@ def interpreter(data, ip):
 	print('Activating scratch')
 	p = Popen(['sudo', 'python', 'simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
 	sleep(2)
-   elif data == 'Name':
-	pass
+   elif data[0:3] == 'Name':
+	print('Feature not implemented yet')
    elif data == 'LED':
 	print('LEDs lighting')
    elif data == 'GPIOoff':
@@ -80,6 +83,7 @@ def pingreplyer():
                 if (time() - lastping) > 30:
                     print('breaking')
                     break
+                sleep(0.01)
                 data = conn.recv(1024)
                 print(data)
                 if not data: break

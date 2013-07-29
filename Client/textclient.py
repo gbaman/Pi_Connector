@@ -31,18 +31,28 @@ def startupimage2():
 
     ''')
     sleep(2)
-
     
 
-def grablist(): #Job is to grab the list off the server of connected clients
+    
+def broadcastfinder():
+    print('Searching for server....')
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind(('', 50010))
+    data, wherefrom = s.recvfrom(1500, 0)
+    #print (data + " " + repr(wherefrom[0]))
+    return(wherefrom[0])
+
+
+def grablist(ipaddress): #Job is to grab the list off the server of connected clients
     gotdata = False
     while gotdata == False: #Will loop till it gets reply from the server
         try:
             message = 'RequestList'
-            host = 'localhost' #Currently hardcoded that the server is on the same machine as the client
+            host = ipaddress #Currently hardcoded that the server is on the same machine as the client
             port = 50000
             size = 1024
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(10)
             s.connect((host,port))
             s.send(message)
             data = s.recv(size)
@@ -116,7 +126,7 @@ def ipmenu(ip):
             
         
 
-def menu(clientlist):
+def menu(clientlist, ipaddress):
     clearer()
     print('Shrimpy classroom management text client')
     print('')
@@ -133,7 +143,7 @@ def menu(clientlist):
 
 
     if answer == '1':
-        clientlist = grablist()
+        clientlist = grablist(ipaddress)
     elif answer == '2':
         for clientnum in range(0, len(clientlist)):
           transmiter('Reboot', clientlist[clientnum])
@@ -152,8 +162,10 @@ def menu(clientlist):
         ipmenu(clientlist[(int(answer) -6 )])
 
 
-    menu(clientlist)
+    menu(clientlist, ipaddress)
 
 startupimage2()
-clientlist = grablist()
-menu(clientlist)
+ipaddress = broadcastfinder()
+#print('Attempting to connect to server')
+clientlist = grablist(ipaddress)
+menu(clientlist, ipaddress)
