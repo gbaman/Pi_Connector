@@ -37,3 +37,4 @@ Changelog
 ============
 0.1 - Initial release - 26.7.2013 - Danger, very buggy
 0.2 - 29.7.2013 - Still very buggy, fixed auto reconnect and added splash screen
+0.2.1 - 30.7.2013 - Still very buggy, rewrote pinger and fixed auto reconnect again...
