@@ -88,7 +88,8 @@ def ipmenu(ip):
         print('5. Flash LEDs on robot')
         print('6. Alive check')
         print('7. Disable all GPIO')
-        print('8. Return to main menu')
+        #print('8. Enable camera live video to this IP - NOT WORKING YET')
+        print('9. Return to main menu')
 
 
         answer = raw_input()
@@ -111,6 +112,8 @@ def ipmenu(ip):
         elif answer == '7':
             message = 'GPIOoff'
         elif answer == '8':
+            message = 'CameraFeed'
+        elif answer == '9':
             transmit = False
             #menu()
         else:

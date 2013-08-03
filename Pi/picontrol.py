@@ -24,6 +24,7 @@ def register(serverip):
     s.send(message)
     data = s.recv(size)
     s.close()
+    print('Register socket closed')
     #print 'Received:', data 
     #print(data)
     if data == 'Accept':
@@ -45,14 +46,17 @@ def interpreter(data, ip):
 	call(['sudo', 'halt'])
    elif data == 'Scratch':
 	print('Activating scratch')
-	p = Popen(['sudo', 'python', 'simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
-	sleep(2)
+	p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
+        #p.kill()
    elif data[0:3] == 'Name':
 	print('Feature not implemented yet')
    elif data == 'LED':
 	print('LEDs lighting')
    elif data == 'GPIOoff':
         allpinsoff()
+   elif data == 'CameraFeed':
+        call(['raspivid -t 999999 -h 720 -w 1080 -fps 25 -hf -b 2000000 -o - | gst-launch-1.0 -v fdsrc ! h264parse !  rtph264pay config-interval=1 pt=96 ! gdppay ! tcpserversink host=192.168.1.3 port=5000'])
+        #call(['raspivid', '-t', '999999',  '-h', '720', '-w', '1080', '-fps', '25', '-hf', '-b', '2000000', '-o', '-', '|', 'gst-launch-1.0', '-v', 'fdsrc', '!', 'h264parse', '!',  'rtph264pay', 'config-interval=1', 'pt=96', '!', 'gdppay', '!', 'tcpserversink', 'host=10.0.5.167', 'port=5000'])
    else:
 	print('Invalid message')
 
@@ -74,9 +78,19 @@ def allpinsoff():
 def pingreplyer(lastping, Server_dead_timeout):
     HOST = ''  
     PORT = 50008
+    #s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     s = socket(AF_INET, SOCK_STREAM)
     s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) # Defining the network interface
-    s.bind((HOST,PORT))
+    bound = False
+    while bound == False:
+        try:
+            s.bind((HOST,PORT))
+            bound = True
+        except error:
+            print('Bind failed, will retry in 5 seconds')
+            sleep(5)
+            bound = False
+        
     s.settimeout(10)
     outloopdone = False
     while outloopdone == False:
@@ -93,10 +107,21 @@ def pingreplyer(lastping, Server_dead_timeout):
                 lastping = time()
             else:
                 interpreter(data, addr)
-            conn.close()
+            #conn.close()
+            #print('Print ping 1 conn closed')
+            #s.close()
+            #print('Print ping 1 s closed')
         except timeout:
-            #print('Timed out, oh dear....')
-            conn.close()
+            #try:
+                #print('Timed out, oh dear....')
+                #conn.close()
+                #print('Print ping 2 conn closed')
+                #s.close()
+                #print('Print ping 2 s closed')
+            #except UnboundLocalError:
+                #s.close()
+                #print('Print ping 2 s closed')
+            pass
         #print((time() - lastping))
         if (time() - lastping > Server_dead_timeout):
             print('')
@@ -105,7 +130,10 @@ def pingreplyer(lastping, Server_dead_timeout):
             print('-------------------------------------------------------------------------')
             print('')
             outloopdone = True
+    conn.close()
+    print('Print ping 1 conn closed')
     s.close()
+    print('Print ping 2 conn closed')
     return(lastping)
     
     
