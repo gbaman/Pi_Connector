@@ -22,19 +22,19 @@ def pinger(clientlist):
         #print(clientlist)
         for clientnum in range(0,len(clientlist)):
             #print('Going round clientnum loop, on loop ' + str(clientnum))
-            address = clientlist[clientnum]
+            address = (clientlist[clientnum].split(":"))[0]
 
             #print('About to ping')
             PORT = 50008             # The same port as used by the server
             s = socket(AF_INET, SOCK_STREAM)
-            s.settimeout(0.1)
+            s.settimeout(0.3)
             try:
             
                 s.connect((address, PORT))
                 s.sendall('Ping')
                 #print('Sent, waiting for data')
                 data = s.recv(1024)
-                #print(data)
+                print(data)
                 
             
                 s.close()
@@ -55,16 +55,20 @@ def pinger(clientlist):
 def datachecker(clientlist):
     print('')
     print('Waiting for incoming messages')
-    s.settimeout(10) #Time between pings
+    s.settimeout(10) #Time to wait before going onto next function
     try:
         client, address = s.accept()
         sleep(0.1)
         data = client.recv(size)
         if data:
-            if data == 'Register':
+            print(data[0:7])
+            if data[0:8] == 'Register':
                 if not (address in clientlist):
                     #print(address)
-                    clientlist.append(str(address[0]))
+                    datas = data.split(":")
+                    serial = datas[1]
+                    print(str(serial))
+                    clientlist.append(str(address[0]) + ':' + serial)
                     print('')
                     print('-------------------------------------')
                     print('Client at ' + str(address[0]) +' added to list')

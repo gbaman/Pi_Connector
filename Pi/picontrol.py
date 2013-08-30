@@ -1,6 +1,6 @@
 #! /usr/bin/python
 
-Server_dead_timeout = 20 #In seconds
+Server_dead_timeout = 23 #In seconds
 
 
 from time import sleep
@@ -12,9 +12,22 @@ try:
 except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
 
+def getserial():
+  # Extract serial from cpuinfo file
+  cpuserial = "0000"
+  try:
+    f = open('/proc/cpuinfo','r')
+    for line in f:
+      if line[0:6]=='Serial':
+        cpuserial = line[22:26]
+    f.close()
+  except:
+    cpuserial = "0000"
+
+  return cpuserial
 
 def register(serverip):
-    message = 'Register'
+    message = 'Register:' + str(getserial())
     host = serverip
     port = 50000
     size = 1024
@@ -47,11 +60,15 @@ def interpreter(data, ip):
    elif data == 'Scratch':
 	print('Activating scratch')
 	p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
+	#global scratchstat
+	#scratchstat = '1'
+	#transmiter('scratchactive', ip)
         #p.kill()
    elif data[0:3] == 'Name':
 	print('Feature not implemented yet')
    elif data == 'LED':
 	print('LEDs lighting')
+	flasher
    elif data == 'GPIOoff':
         allpinsoff()
    elif data == 'CameraFeed':
@@ -73,7 +90,14 @@ def allpinsoff():
         GPIO.output((pinlist[pinnum]), False)
     GPIO.cleanup()
 
-
+def flasher():
+    GPIO.setwarnings(False)
+    GPIO.cleanup()
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(11,GPIO.OUT)
+    GPIO.output(11,True)
+    sleep(1)
+    GPIO.output(11,False)
 
 def pingreplyer(lastping, Server_dead_timeout):
     HOST = ''  
@@ -102,8 +126,8 @@ def pingreplyer(lastping, Server_dead_timeout):
             print('Pinged by server at ' + str(addr[0]))
             data = conn.recv(1024)
             if not data: break
-            if data == 'Ping':
-                conn.sendall('Alive')
+            if data == 'Ping': 
+                conn.sendall('Alive:'+str(getserial()))
                 lastping = time()
             else:
                 interpreter(data, addr)
