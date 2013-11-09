@@ -13,7 +13,7 @@ except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
 
 def getserial():
-  # Extract serial from cpuinfo file
+  # Extract serial from cpuinfo file to return
   cpuserial = "0000"
   try:
     f = open('/proc/cpuinfo','r')
@@ -51,31 +51,31 @@ def register(serverip):
     #print(data[1])
 
 def interpreter(data, ip):
-   if data == 'Reboot':
-	print('Rebooting')
-	call(['sudo', 'reboot'])
-   elif data == 'Shutdown':
-	print('Shutting down')
-	call(['sudo', 'halt'])
-   elif data == 'Scratch':
-	print('Activating scratch')
-	p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
-	#global scratchstat
-	#scratchstat = '1'
-	#transmiter('scratchactive', ip)
+    if data == 'Reboot':
+        print('Rebooting')
+        call(['sudo', 'reboot'])
+    elif data == 'Shutdown':
+        print('Shutting down')
+        call(['sudo', 'halt'])
+    elif data == 'Scratch':
+        print('Activating scratch')
+        p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
+        #global scratchstat
+        #scratchstat = '1'
+        #transmiter('scratchactive', ip)
         #p.kill()
-   elif data[0:3] == 'Name':
-	print('Feature not implemented yet')
-   elif data == 'LED':
-	print('LEDs lighting')
-	flasher
-   elif data == 'GPIOoff':
+    elif data[0:3] == 'Name':
+        print('Feature not implemented yet')
+    elif data == 'LED':
+        print('LEDs lighting')
+        flasher
+    elif data == 'GPIOoff':
         allpinsoff()
-   elif data == 'CameraFeed':
+    elif data == 'CameraFeed':
         call(['raspivid -t 999999 -h 720 -w 1080 -fps 25 -hf -b 2000000 -o - | gst-launch-1.0 -v fdsrc ! h264parse !  rtph264pay config-interval=1 pt=96 ! gdppay ! tcpserversink host=192.168.1.3 port=5000'])
         #call(['raspivid', '-t', '999999',  '-h', '720', '-w', '1080', '-fps', '25', '-hf', '-b', '2000000', '-o', '-', '|', 'gst-launch-1.0', '-v', 'fdsrc', '!', 'h264parse', '!',  'rtph264pay', 'config-interval=1', 'pt=96', '!', 'gdppay', '!', 'tcpserversink', 'host=10.0.5.167', 'port=5000'])
-   else:
-	print('Invalid message')
+    else:
+        print('Invalid message')
 
 
 
