@@ -155,9 +155,9 @@ def pingreplyer(lastping, Server_dead_timeout):
             print('')
             outloopdone = True
     conn.close()
-    print('Print ping 1 conn closed')
+    print('Ping 1 conn closed')
     s.close()
-    print('Print ping 2 conn closed')
+    print('Ping 2 conn closed')
     return(lastping)
     
     
@@ -175,6 +175,15 @@ def broadcastfinder():
 #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 lastping = int(time())
 while 1:
-    serverip = broadcastfinder()
-    lastping = register(serverip)
-    lastping = pingreplyer(lastping, Server_dead_timeout)
+    try:
+        serverip = broadcastfinder()
+        lastping = register(serverip)
+        lastping = pingreplyer(lastping, Server_dead_timeout)
+    except:
+        print('************************************')
+        print("System error...")
+        print('************************************')
+        print("")
+        sleep(1)
+        print("RESTARTING")
+        sleep(3)

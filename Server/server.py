@@ -1,7 +1,9 @@
 import sys
 from socket import *
 from time import sleep
+import traceback
 import json
+import sqlite3
 
 def broadcaster():
     s = socket(AF_INET, SOCK_DGRAM)
@@ -22,7 +24,7 @@ def pinger(clientlist):
         #print(clientlist)
         for clientnum in range(0,len(clientlist)):
             #print('Going round clientnum loop, on loop ' + str(clientnum))
-            address = (clientlist[clientnum].split(":"))[0]
+            address = (clientlist[clientnum][0])
 
             #print('About to ping')
             PORT = 50008             # The same port as used by the server
@@ -63,12 +65,16 @@ def datachecker(clientlist):
         if data:
             print(data[0:7])
             if data[0:8] == 'Register':
-                if not (address in clientlist):
+                exist = False
+                for count in range(0, len(clientlist)):
+                    if (address in clientlist[count]):
+                        exist = True
+                if exist == False:
                     #print(address)
                     datas = data.split(":")
                     serial = datas[1]
                     print(str(serial))
-                    clientlist.append(str(address[0]) + ':' + serial)
+                    clientlist.append([str(address[0]),  serial])
                     print('')
                     print('-------------------------------------')
                     print('Client at ' + str(address[0]) +' added to list')
@@ -85,20 +91,54 @@ def datachecker(clientlist):
         pass
         #print('Timeout')
     return clientlist
-    
 
-host = ''
-port = 50000
-backlog = 5
-size = 1024
-s = socket(AF_INET, SOCK_STREAM)
-s.bind((host,port))
-s.listen(backlog)
-#clientlist = ['10.0.5.173','10.5.2.3']
-s.settimeout(5)
-clientlist = []
-while 1:
-    broadcaster()
-    pinger(clientlist)
-    clientlist = datachecker(clientlist)
+def createDatabase(sqlc, sql):
+    print("Creating database")
+    sqlc.execute('''CREATE TABLE ClientID
+(
+CId int NOT NULL,
+IP varchar(15) NOT NULL,
+Serial int(4) NOT NULL,
+Name varchar(30),
+PRIMARY KEY (CId)
+)''')
+    #sql.commit()
+
+
+while True:
+    try:
+
+        host = ''
+        port = 50000
+        backlog = 5
+        size = 1024
+        s = socket(AF_INET, SOCK_STREAM)
+        s.bind((host,port))
+        s.listen(backlog)
+        #clientlist = ['10.0.5.173','10.5.2.3']
+        s.settimeout(5)
+        clientlist = []
+        sql = sqlite3.connect('Pi-control.db')
+        sqlc = sql.cursor()
+        stmt = "SHOW TABLES LIKE 'ClientID'"
+        sqlc.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ClientID';")
+        result = ""
+        result = sqlc.fetchone()
+        print(str(result))
+        if (result) == None:
+            createDatabase(sql, sqlc)
+        while 1:
+            broadcaster()
+            pinger(clientlist)
+            clientlist = datachecker(clientlist)
+    except:
+        print('************************************')
+        print("System error...")
+        traceback.print_exc(file=sys.stdout)
+        print('************************************')
+        print("")
+        print("Hit any key to proceed")
+        raw_input()
+        print("RESTARTING")
+        sleep(3)
 
