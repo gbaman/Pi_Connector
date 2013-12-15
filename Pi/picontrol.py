@@ -154,8 +154,11 @@ def pingreplyer(lastping, Server_dead_timeout):
             print('-------------------------------------------------------------------------')
             print('')
             outloopdone = True
-    conn.close()
-    print('Ping 1 conn closed')
+    try:
+        conn.close()
+        print('Ping 1 conn closed')
+    except:
+        pass
     s.close()
     print('Ping 2 conn closed')
     return(lastping)
@@ -179,7 +182,7 @@ while 1:
         serverip = broadcastfinder()
         lastping = register(serverip)
         lastping = pingreplyer(lastping, Server_dead_timeout)
-    except:
+    except (not KeyboardInterrupt):
         print('************************************')
         print("System error...")
         print('************************************')
