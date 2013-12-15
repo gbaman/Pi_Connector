@@ -1,9 +1,9 @@
-import sys
 from socket import *
 from time import sleep
 import traceback
 import json
 import sqlite3
+import threading
 
 def broadcaster():
     s = socket(AF_INET, SOCK_DGRAM)
@@ -52,61 +52,33 @@ def pinger(clientlist):
             #print(delnum)
             if delnum in todelete:
                 del clientlist[delnum]
-            
 
+class ping(threading.Thread):
 
-def pinger2(sql, sqlc):
-    for row in sqlc.execute("""SELECT IP FROM ClientID"""):
-        s = socket(AF_INET, SOCK_STREAM)
-        s.settimeout(0.3)
-        try:
-            s.connect((row[0], 50008))
-            s.sendall('Ping')
-            data = s.recv(1024)
-            s.close()
-        except error:
-            sqlc.execute("""DELETE FROM ClientID WHERE IP = ?""", row)
-            sql.commit()
+    def __init__(self):
+        super(ping, self).__init__()
+        self.pingFreq = 3
 
+    def run(self):
+        while True:
+            sql = sqlite3.connect('Pi-control.db')
+            self.pinger2(sql)
+            sleep(self.pingFreq)
 
+    def pinger2(self,sql):
+        sqlp = sql.cursor()
+        for row in sqlp.execute("""SELECT IP FROM ClientID"""):
+            s = socket(AF_INET, SOCK_STREAM)
+            s.settimeout(0.3)
+            try:
+                s.connect((row[0], 50008))
+                s.sendall('Ping')
+                self.data = s.recv(1024)
+                s.close()
+            except error:
+                sqlp.execute("""DELETE FROM ClientID WHERE IP = ?""", row)
+                sql.commit()
 
-def datachecker(clientlist):
-    print('')
-    print('Waiting for incoming messages')
-    s.settimeout(10) #Time to wait before going onto next function
-    try:
-        client, address = s.accept()
-        sleep(0.1)
-        data = client.recv(size)
-        if data:
-            print(data[0:7])
-            if data[0:8] == 'Register':
-                exist = False
-                for count in range(0, len(clientlist)):
-                    if (address in clientlist[count]):
-                        exist = True
-                if exist == False:
-                    #print(address)
-                    datas = data.split(":")
-                    serial = datas[1]
-                    print(str(serial))
-                    clientlist.append([str(address[0]),  serial])
-                    print('')
-                    print('-------------------------------------')
-                    print('Client at ' + str(address[0]) +' added to list')
-                    print('-------------------------------------')
-                    print('')
-                client.send('Accept')
-                sleep(0.05)
-            elif data == 'RequestList':
-                tosendlist = json.dumps(clientlist)
-                client.send(tosendlist)
-            #print(data)
-        client.close()
-    except timeout:
-        pass
-        #print('Timeout')
-    return clientlist
 
 
 def datachecker2(sql, sqlc):
@@ -203,12 +175,13 @@ while True:
         clientlist = []
         sql = sqlite3.connect('Pi-control.db')
         sqlc = InitalSQL(sql)
+        p = ping()
 
-
+        p.start() #Starts the pinger thread
         while 1:
             broadcaster()
             #pinger(clientlist)
-            pinger2(sql,sqlc)
+            #p.pinger2(sql,sqlc)
             #clientlist = datachecker(clientlist)
             datachecker2(sql,sqlc)
     except (not KeyboardInterrupt):
