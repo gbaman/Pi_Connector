@@ -79,7 +79,7 @@ def ipmenu(ip):
     menurun = True
     while menurun == True:
         print('What would you like to do with this Raspberry Pi?')
-        print('Currently connected to ' + str(ip))
+        print('Currently connected to ' + str(ip[0]))
         print('')
         print('1. Reboot')
         print('2. Shutdown')
@@ -139,9 +139,9 @@ def menu(clientlist, ipaddress):
     print('4. Kill all GPIO pins')
     print('')
     print('Connected Raspberry Pis')
-    #print('')
+    #print(clientlist)
     for clientnum in range(0, len(clientlist)):
-        print(str(clientnum + 5) + '. ' + clientlist[clientnum])
+        print(str(clientnum + 5) + '. ' + clientlist[clientnum][0])
     answer = raw_input()
 
 
