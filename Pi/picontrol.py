@@ -182,7 +182,7 @@ while 1:
         serverip = broadcastfinder()
         lastping = register(serverip)
         lastping = pingreplyer(lastping, Server_dead_timeout)
-    except (not KeyboardInterrupt):
+    except: # (not KeyboardInterrupt):
         print('************************************')
         print("System error...")
         print('************************************')

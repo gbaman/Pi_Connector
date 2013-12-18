@@ -1,3 +1,4 @@
+import sys
 from socket import *
 from time import sleep
 import traceback
@@ -49,7 +50,7 @@ def pinger(clientlist):
 
         for delnum in range(0 ,len(todelete)+1):
             #print(str(todelete))
-            #print(delnum)
+            #print(delnum)f
             if delnum in todelete:
                 del clientlist[delnum]
 
@@ -60,8 +61,8 @@ class ping(threading.Thread):
         self.pingFreq = 3
 
     def run(self):
+        sql = sqlite3.connect('Pi-control.db')
         while True:
-            sql = sqlite3.connect('Pi-control.db')
             self.pinger2(sql)
             sleep(self.pingFreq)
 
@@ -79,6 +80,34 @@ class ping(threading.Thread):
                 sqlp.execute("""DELETE FROM ClientID WHERE IP = ?""", row)
                 sql.commit()
 
+class transmissionHandler(threading.Thread):
+    def __init__(self, ip, data):
+        super(transmissionHandler, self).__init__()
+        print(ip)
+        self.ip = ip
+        self.data = data
+
+    def run(self):
+        sql = sqlite3.connect('Pi-control.db')
+        self.TransHandler(self.ip, self.data, sql)
+    def TransHandler(self, ip, data, sql):
+        print("Handler called!!")
+        self.interpreter(ip, data, sql)
+    def interpreter(self, ip, data, sql):
+        #print(data[0:4])
+        if data[0:4] == "name":
+            print(data)
+            self.name = (data.split(':'))[1]
+            self.ip = (data.split(':'))[2]
+            #data = data[1]
+            d = (self.name, self.ip)
+            sqld = sql.cursor()
+            sqld.execute("""UPDATE ClientID SET Name = ? WHERE IP = ?""",d)
+            print(d)
+            sql.commit()
+        sql.close()
+
+
 
 
 def datachecker2(sql, sqlc):
@@ -90,7 +119,8 @@ def datachecker2(sql, sqlc):
         sleep(0.1)
         data = client.recv(size)
         if data:
-            print(data[0:7])
+            #print(data[0:7])
+            print(data)
             if data[0:8] == 'Register':
                 ip = (address[0],)
                 print(str(ip))
@@ -116,6 +146,11 @@ def datachecker2(sql, sqlc):
                 tosendlist = sqlc.fetchall()
                 client.send(json.dumps(tosendlist))
                 print(tosendlist)
+            else:
+                print(address[0])
+                t = transmissionHandler(address[0], data)
+                t.daemon = True
+                t.start()
 
             client.close()
     except timeout:
@@ -175,16 +210,19 @@ while True:
         clientlist = []
         sql = sqlite3.connect('Pi-control.db')
         sqlc = InitalSQL(sql)
-        p = ping()
 
+        p = ping()
+        p.daemon = True
         p.start() #Starts the pinger thread
+
+
         while 1:
             broadcaster()
             #pinger(clientlist)
             #p.pinger2(sql,sqlc)
             #clientlist = datachecker(clientlist)
             datachecker2(sql,sqlc)
-    except (not KeyboardInterrupt):
+    except:
         print('************************************')
         print("System error...")
         traceback.print_exc(file=sys.stdout) #Prints out traceback error

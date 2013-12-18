@@ -48,7 +48,7 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
     while gotdata == False: #Will loop till it gets reply from the server
         try:
             message = 'RequestList'
-            host = ipaddress #Currently hardcoded that the server is on the same machine as the client
+            host = ipaddress
             port = 50000
             size = 1024
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -64,8 +64,8 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             print('Can not find server, trying again')
             sleep(2)
 
-def transmiter(message, ip):
-    port = 50008
+def transmiter(message, ip, port = 50008):
+    #port = 50008
     size = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     print((ip,port))
@@ -74,7 +74,7 @@ def transmiter(message, ip):
     sleep(0.2)
     s.close()
 
-def ipmenu(ip):
+def ipmenu(ip, serverIP):
     clearer()
     menurun = True
     while menurun == True:
@@ -104,7 +104,10 @@ def ipmenu(ip):
         elif answer == '4':
             print('Please enter name')
             name = raw_input()
-            message = 'name :' + name
+            message = ('name :' + name + ':' + ip[0])
+            transmit = False
+            transmiter(message,serverIP, 50000)
+
         elif answer == '5':
             message = 'LED'
         elif answer == '6':
@@ -162,7 +165,7 @@ def menu(clientlist, ipaddress):
             
     elif (not(int(answer) == 1)) and ((int(answer) - 4) < (len(clientlist)+1)):
         print('Valid')
-        ipmenu(clientlist[(int(answer) -6 )])
+        ipmenu(clientlist[(int(answer) -6 )], ipaddress)
 
 
     menu(clientlist, ipaddress)
