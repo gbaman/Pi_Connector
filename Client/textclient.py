@@ -74,6 +74,14 @@ def transmiter(message, ip, port = 50008):
     sleep(0.2)
     s.close()
 
+def grouper(ip):
+    MenuRun = True
+    while MenuRun == True:
+        print('What would you like to do?')
+        print('')
+
+
+
 def ipmenu(ip, serverIP):
     clearer()
     menurun = True
@@ -89,7 +97,8 @@ def ipmenu(ip, serverIP):
         print('6. Alive check')
         print('7. Disable all GPIO')
         #print('8. Enable camera live video to this IP - NOT WORKING YET')
-        print('9. Return to main menu')
+        print('9. Add to group')
+        print('10. Return to main menu')
 
 
         answer = raw_input()
@@ -118,6 +127,9 @@ def ipmenu(ip, serverIP):
             message = 'CameraFeed'
         elif answer == '9':
             transmit = False
+            grouper(ip)
+        elif answer == '10':
+            transmit = False
             #menu()
         else:
             print('Please enter valid option')
@@ -133,6 +145,7 @@ def ipmenu(ip, serverIP):
         
 
 def menu(clientlist, ipaddress):
+    clientlist = grablist(ipaddress)
     clearer()
     print('Shrimpy classroom management text client')
     print('')
@@ -144,7 +157,7 @@ def menu(clientlist, ipaddress):
     print('Connected Raspberry Pis')
     #print(clientlist)
     for clientnum in range(0, len(clientlist)):
-        print(str(clientnum + 5) + '. ' + clientlist[clientnum][0])
+        print(str(clientnum + 5) + '. ' + clientlist[clientnum][0] + ' - ' + clientlist[clientnum][2])
     answer = raw_input()
 
 

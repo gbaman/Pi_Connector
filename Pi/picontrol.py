@@ -2,7 +2,8 @@
 
 Server_dead_timeout = 23 #In seconds
 
-
+import traceback
+import sys
 from time import sleep
 from time import time
 from socket import *
@@ -185,6 +186,7 @@ while 1:
     except: # (not KeyboardInterrupt):
         print('************************************')
         print("System error...")
+        traceback.print_exc(file=sys.stdout) #Prints out traceback error
         print('************************************')
         print("")
         sleep(1)

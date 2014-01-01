@@ -37,7 +37,7 @@ def pinger(clientlist):
                 s.sendall('Ping')
                 #print('Sent, waiting for data')
                 data = s.recv(1024)
-                print(data)
+                #print(data)
                 
             
                 s.close()
@@ -53,6 +53,25 @@ def pinger(clientlist):
             #print(delnum)f
             if delnum in todelete:
                 del clientlist[delnum]
+
+class sender(threading.Thread):
+
+    def __init__(self, sendlist, data):
+        super(sender, self).__init__()
+        self.sendlist = sendlist
+        self.data = data
+    def run(self):
+        for client in range(0, len(self.sendlist)):
+            try:
+                self.send(self.sendlist[client], self.data)
+            except:
+                print("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data))
+    def send(self, client, data):
+        s = socket(AF_INET, SOCK_STREAM)
+        s.settimeout(0.3)
+        s.connect((client, 50008))
+        s.sendall(data)
+        s.close()
 
 class ping(threading.Thread):
 
@@ -96,14 +115,19 @@ class transmissionHandler(threading.Thread):
     def interpreter(self, ip, data, sql):
         #print(data[0:4])
         if data[0:4] == "name":
-            print(data)
+            #print(data)
             self.name = (data.split(':'))[1]
             self.ip = (data.split(':'))[2]
             #data = data[1]
-            d = (self.name, self.ip)
+            #d = (self.name, self.ip)
             sqld = sql.cursor()
-            sqld.execute("""UPDATE ClientID SET Name = ? WHERE IP = ?""",d)
-            print(d)
+            #print(self.ip)
+            sqld.execute("""SELECT Serial FROM ClientID WHERE Ip = ? """,(self.ip,) )
+            #if sqld.fetchone() == None:
+            #print(sqld.fetchone())
+            d = (self.name, sqld.fetchone()[0])
+            sqld.execute("""UPDATE Metadata SET Name = ? WHERE Serial = ?""",d)
+            #print(d)
             sql.commit()
         sql.close()
 
@@ -132,6 +156,9 @@ def datachecker2(sql, sqlc):
                     dat = (address[0], serial)
                     print(dat)
                     sqlc.execute("""INSERT INTO ClientID VALUES(NULL,?, ?, NULL)""", dat)
+                    sqlc.execute("""SELECT Serial FROM Metadata WHERE Serial = ? """, (serial,))
+                    if sqlc.fetchone() == None:
+                        sqlc.execute("""INSERT INTO Metadata VALUES(?,NULL) """, (serial,))
                     sql.commit()
                     print('')
                     print('-------------------------------------')
@@ -142,7 +169,10 @@ def datachecker2(sql, sqlc):
                 client.send('Accept')
                 sleep(0.05)
             elif data == 'RequestList':
-                sqlc.execute("""SELECT IP, Serial FROM ClientID""")
+                sqlc.execute("""SELECT ClientID.IP, ClientID.Serial, Metadata.Name
+                            FROM ClientID
+                            INNER JOIN Metadata
+                            ON ClientID.Serial = Metadata.Serial""")
                 tosendlist = sqlc.fetchall()
                 client.send(json.dumps(tosendlist))
                 print(tosendlist)
@@ -165,10 +195,13 @@ def createDatabase(sqlc, sql):
 (
 CId INTEGER PRIMARY KEY AUTOINCREMENT,
 IP varchar(15) NOT NULL,
-Serial int(4) NOT NULL,
+Serial varchar(4) NOT NULL,
 Name varchar(30)
 )''')
     sqlc.execute("""CREATE  TABLE "main"."Connection" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "IP" VARCHAR NOT NULL , "Key" INTEGER)""")
+    sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Metadata" ("Serial" VARCHAR PRIMARY KEY  NOT NULL  UNIQUE , "Name" VARCHAR)""")
+    sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Group" ("GroupID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Name" VARCHAR NOT NULL , "Description" VARCHAR)""")
+    sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."GroupConnection" ("ID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Serial" VARCHAR NOT NULL , "GroupID" INTEGER NOT NULL )""")
     #sql.commit()
 
 def setupNetworking():
