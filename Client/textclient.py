@@ -54,23 +54,31 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(10)
             s.connect((host,port))
-            s.send(message)
-            data = s.recv(size)
-            data = json.loads(data)
-            s.close()
-            gotdata = True
-            return data
+            s.send(json.dumps((message,)))
+            waiting = True
+            while waiting == True:
+                data = s.recv(size)
+                if data:
+                    print('data is ' + str(data))
+                    data = json.loads(data)
+                    s.close()
+                    gotdata = True
+                    waiting = False
+                    return data[0]
+                else:
+                    print('waiting for data..')
+                    sleep(0.2)
         except socket.error:
             print('Can not find server, trying again')
             sleep(2)
 
-def transmiter(message, ip, port = 50008):
+def transmiter(message, ip, payload = None, port = 50008):
     #port = 50008
     size = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     print((ip,port))
     s.connect((ip,port))
-    s.send(message)
+    s.send(json.dumps(message, payload))
     sleep(0.2)
     s.close()
 
@@ -113,9 +121,9 @@ def ipmenu(ip, serverIP):
         elif answer == '4':
             print('Please enter name')
             name = raw_input()
-            message = ('name :' + name + ':' + ip[0])
+            message = ((name, ip[0]))
             transmit = False
-            transmiter(message,serverIP, 50000)
+            transmiter('name', serverIP, message,  50000)
 
         elif answer == '5':
             message = 'LED'
@@ -157,7 +165,7 @@ def menu(clientlist, ipaddress):
     print('Connected Raspberry Pis')
     #print(clientlist)
     for clientnum in range(0, len(clientlist)):
-        print(str(clientnum + 5) + '. ' + clientlist[clientnum][0] + ' - ' + clientlist[clientnum][2])
+        print(str(clientnum + 5) + '. ' + clientlist[clientnum][0] + ' - ' + str(clientlist[clientnum][2]))
     answer = raw_input()
 
 

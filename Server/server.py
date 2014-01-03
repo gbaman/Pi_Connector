@@ -14,46 +14,6 @@ def broadcaster():
     print('Broadcasting to network my IP')
     s.close()
 
-def pinger(clientlist):
-    if clientlist == []:
-        print('No Pis to ping')
-    else:
-        message = 'bob'
-        todelete = []
-        #clientlist = ['10.0.5.173','10.5.2.3']
-        print('Starting pinger. Addresses to ping = ' + str(clientlist))
-        #print(clientlist)
-        for clientnum in range(0,len(clientlist)):
-            #print('Going round clientnum loop, on loop ' + str(clientnum))
-            address = (clientlist[clientnum][0])
-
-            #print('About to ping')
-            PORT = 50008             # The same port as used by the server
-            s = socket(AF_INET, SOCK_STREAM)
-            s.settimeout(0.3)
-            try:
-            
-                s.connect((address, PORT))
-                s.sendall('Ping')
-                #print('Sent, waiting for data')
-                data = s.recv(1024)
-                #print(data)
-                
-            
-                s.close()
-                #print('Socket closed')
-
-            except error :
-                #print('Socket timed out')
-                todelete.append(clientnum)
-                #print(clientlist)
-
-        for delnum in range(0 ,len(todelete)+1):
-            #print(str(todelete))
-            #print(delnum)f
-            if delnum in todelete:
-                del clientlist[delnum]
-
 class sender(threading.Thread):
 
     def __init__(self, sendlist, data):
@@ -70,7 +30,7 @@ class sender(threading.Thread):
         s = socket(AF_INET, SOCK_STREAM)
         s.settimeout(0.3)
         s.connect((client, 50008))
-        s.sendall(data)
+        s.sendall(json.dumps((data,)))
         s.close()
 
 class ping(threading.Thread):
@@ -92,7 +52,7 @@ class ping(threading.Thread):
             s.settimeout(0.3)
             try:
                 s.connect((row[0], 50008))
-                s.sendall('Ping')
+                s.sendall(json.dumps(('Ping',)))
                 self.data = s.recv(1024)
                 s.close()
             except error:
@@ -113,11 +73,12 @@ class transmissionHandler(threading.Thread):
         print("Handler called!!")
         self.interpreter(ip, data, sql)
     def interpreter(self, ip, data, sql):
-        #print(data[0:4])
-        if data[0:4] == "name":
+        print(data[0])
+        if data[0] == "name":
             #print(data)
-            self.name = (data.split(':'))[1]
-            self.ip = (data.split(':'))[2]
+            self.name = (data[1][0])
+            self.ip = (data[1][1])
+            print("IP is " + str(self.ip) + " Name is " + str(self.name))
             #data = data[1]
             #d = (self.name, self.ip)
             sqld = sql.cursor()
@@ -143,15 +104,16 @@ def datachecker2(sql, sqlc):
         sleep(0.1)
         data = client.recv(size)
         if data:
+            data = json.loads(data)
             #print(data[0:7])
             print(data)
-            if data[0:8] == 'Register':
+            if data[0] == 'Register':
                 ip = (address[0],)
                 print(str(ip))
                 sqlc.execute("""SELECT CId, IP, Serial, Name FROM ClientID WHERE IP = ? """, ip)
                 if sqlc.fetchone() == None:
-                    datas = data.split(":")
-                    serial = str(datas[1])
+                    #datas = data.split(":")
+                    serial = str(data[1])
                     print(serial)
                     dat = (address[0], serial)
                     print(dat)
@@ -166,16 +128,16 @@ def datachecker2(sql, sqlc):
                     print('-------------------------------------')
                     print('')
                 print("Data adding sorted")
-                client.send('Accept')
+                client.send(json.dumps(('Accept',)))
                 sleep(0.05)
-            elif data == 'RequestList':
+            elif data[0] == 'RequestList':
                 sqlc.execute("""SELECT ClientID.IP, ClientID.Serial, Metadata.Name
                             FROM ClientID
                             INNER JOIN Metadata
                             ON ClientID.Serial = Metadata.Serial""")
                 tosendlist = sqlc.fetchall()
-                client.send(json.dumps(tosendlist))
-                print(tosendlist)
+                client.send(json.dumps((tosendlist,)))
+                print('sending list! ' + str(tosendlist))
             else:
                 print(address[0])
                 t = transmissionHandler(address[0], data)

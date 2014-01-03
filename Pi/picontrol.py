@@ -8,6 +8,8 @@ from time import sleep
 from time import time
 from socket import *
 from subprocess import Popen, call
+import threading
+import json
 try:
     import RPi.GPIO as GPIO
 except ImportError:
@@ -27,15 +29,31 @@ def getserial():
 
   return cpuserial
 
+
+def transmiter(message, ip, payload = None, expecting = False, port = 50008):
+    #port = 50008
+    size = 1024
+    s = socket(AF_INET, SOCK_STREAM)
+    print((ip,port))
+    s.connect((ip,port))
+    s.send(json.dumps(message, payload))
+    sleep(0.2)
+    if expecting:
+        data = json.loads(s.recv(size))
+        return data
+    else:
+        return None
+    s.close()
+
 def register(serverip):
-    message = 'Register:' + str(getserial())
+    message = ('Register', str(getserial()))
     host = serverip
     port = 50000
     size = 1024
     s = socket(AF_INET, SOCK_STREAM)
     s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     s.connect((host,port))
-    s.send(message)
+    s.send(json.dumps(message))
     data = s.recv(size)
     s.close()
     print('Register socket closed')
@@ -52,27 +70,27 @@ def register(serverip):
     #print(data[1])
 
 def interpreter(data, ip):
-    if data == 'Reboot':
+    if data[0] == 'Reboot':
         print('Rebooting')
         call(['sudo', 'reboot'])
-    elif data == 'Shutdown':
+    elif data[0] == 'Shutdown':
         print('Shutting down')
         call(['sudo', 'halt'])
-    elif data == 'Scratch':
+    elif data[0] == 'Scratch':
         print('Activating scratch')
         p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
         #global scratchstat
         #scratchstat = '1'
         #transmiter('scratchactive', ip)
         #p.kill()
-    elif data[0:3] == 'Name':
+    elif data[0] == 'Name':
         print('Feature not implemented yet')
-    elif data == 'LED':
+    elif data[0] == 'LED':
         print('LEDs lighting')
         flasher
-    elif data == 'GPIOoff':
+    elif data[0] == 'GPIOoff':
         allpinsoff()
-    elif data == 'CameraFeed':
+    elif data[0] == 'CameraFeed':
         call(['raspivid -t 999999 -h 720 -w 1080 -fps 25 -hf -b 2000000 -o - | gst-launch-1.0 -v fdsrc ! h264parse !  rtph264pay config-interval=1 pt=96 ! gdppay ! tcpserversink host=192.168.1.3 port=5000'])
         #call(['raspivid', '-t', '999999',  '-h', '720', '-w', '1080', '-fps', '25', '-hf', '-b', '2000000', '-o', '-', '|', 'gst-launch-1.0', '-v', 'fdsrc', '!', 'h264parse', '!',  'rtph264pay', 'config-interval=1', 'pt=96', '!', 'gdppay', '!', 'tcpserversink', 'host=10.0.5.167', 'port=5000'])
     else:
@@ -125,10 +143,13 @@ def pingreplyer(lastping, Server_dead_timeout):
             conn, addr = s.accept()
             #print 'Connected by', addr
             print('Pinged by server at ' + str(addr[0]))
-            data = conn.recv(1024)
+            sleep(0.05)
+            data = json.loads(conn.recv(1024))
             if not data: break
-            if data == 'Ping': 
-                conn.sendall('Alive:'+str(getserial()))
+            print(data[0])
+            #print(data[1])
+            if data[0] == 'Ping':
+                conn.sendall(json.dumps(('Alive',str(getserial()))))
                 lastping = time()
             else:
                 interpreter(data, addr)
