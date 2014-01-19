@@ -1,10 +1,11 @@
-import os, socket, json
+import os, socket, json, getpass
 from time import sleep
 
 def clearer():
     #Simple function that clears the screen
     os.system('cls' if os.name=='nt' else 'clear')
 
+mainToken = 0
 
 def startupimage2():
     clearer()
@@ -44,6 +45,7 @@ def broadcastfinder():
 
 
 def grablist(ipaddress): #Job is to grab the list off the server of connected clients
+    global mainToken
     gotdata = False
     while gotdata == False: #Will loop till it gets reply from the server
         try:
@@ -54,12 +56,12 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(10)
             s.connect((host,port))
-            s.send(json.dumps((message,)))
+            s.send(json.dumps((message, "", mainToken)))
             waiting = True
             while waiting == True:
                 data = s.recv(size)
                 if data:
-                    print('data is ' + str(data))
+                    #print('data is ' + str(data))
                     data = json.loads(data)
                     s.close()
                     gotdata = True
@@ -73,20 +75,90 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             sleep(2)
 
 def transmiter(message, ip, payload = None, port = 50008):
+    global mainToken
     #port = 50008
+    #print('---------')
+    #print(message)
+    #print(ip)
+    #print('---------')
     size = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     print((ip,port))
     s.connect((ip,port))
-    s.send(json.dumps(message, payload))
+    #print("Sending")
+    #print((json.dumps((message, payload))))
+    s.send(json.dumps((message, payload, mainToken)))
     sleep(0.2)
     s.close()
+
+
+def transmiterReturn(message, ip, payload = None, port = 50008):
+    global mainToken
+    #port = 50008
+    #print('---------')
+    #print(message)
+    #print(ip)
+    #print('---------')
+    size = 1024
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    print((ip,port))
+    s.connect((ip,port))
+    #print("Sending")
+    #print((json.dumps((message, payload))))
+    s.send(json.dumps((message, payload, mainToken)))
+    data = s.recv(size)
+    if data:
+        #print('data is ' + str(data))
+        data = json.loads(data)
+        s.close()
+        gotdata = True
+        waiting = False
+        return data[0]
+    else:
+        print('waiting for data..')
+        sleep(0.2)
 
 def grouper(ip):
     MenuRun = True
     while MenuRun == True:
         print('What would you like to do?')
         print('')
+        break
+
+
+class LoginC():
+    def __init__(self, serverIP):
+        self.serverIP = serverIP
+        self.token = ""
+
+    def getToken(self):
+        success = False
+        while success == False:
+            credentials =  self.details()
+            self.token = transmiterReturn("Token", self.serverIP, credentials, 50000)
+            if (int(self.token) == 0):
+                print("")
+                print("---------------------")
+                print("Incorrect credentials")
+                print("---------------------")
+                print("")
+            else:
+                success = True
+        print("Token is " + str(self.token))
+        global mainToken
+        mainToken = self.token
+
+
+
+    def details(self):
+        print("Please enter your username")
+        username = raw_input()
+        print("Please enter password")
+        password = getpass.getpass()
+        print(password)
+        return ((username, password))
+
+
 
 
 
@@ -148,6 +220,7 @@ def ipmenu(ip, serverIP):
         if transmit == True:
             print('Transmitting message')
             #sleep(1)
+            #print("The server IP is " + str(ip))
             transmiter(message, ip)
             
         
@@ -182,17 +255,20 @@ def menu(clientlist, ipaddress):
         for clientnum in range(0, len(clientlist)):
           print(clientnum)
           print(clientlist[clientnum])
-          transmiter('GPIOoff', clientlist[clientnum])
+          transmiter('GPIOoff', clientlist[clientnum][0])
             
     elif (not(int(answer) == 1)) and ((int(answer) - 4) < (len(clientlist)+1)):
         print('Valid')
-        ipmenu(clientlist[(int(answer) -6 )], ipaddress)
+        ipmenu(clientlist[(int(answer) -6 )][0], ipaddress)
 
 
     menu(clientlist, ipaddress)
 
+
 startupimage2()
 ipaddress = broadcastfinder()
+login = LoginC(ipaddress)
+login.getToken()
 #print('Attempting to connect to server')
 clientlist = grablist(ipaddress)
 menu(clientlist, ipaddress)

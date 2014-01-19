@@ -10,10 +10,13 @@ from socket import *
 from subprocess import Popen, call
 import threading
 import json
+from datetime import datetime
 try:
     import RPi.GPIO as GPIO
+    GpioFound = True
 except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
+    GpioFound = False
 
 def getserial():
   # Extract serial from cpuinfo file to return
@@ -87,7 +90,7 @@ def interpreter(data, ip):
         print('Feature not implemented yet')
     elif data[0] == 'LED':
         print('LEDs lighting')
-        flasher
+        #flasher()
     elif data[0] == 'GPIOoff':
         allpinsoff()
     elif data[0] == 'CameraFeed':
@@ -99,26 +102,31 @@ def interpreter(data, ip):
 
 
 def allpinsoff():
-    pinlist = [3, 5, 7, 11, 12, 13, 15, 16, 18, 19, 21, 22, 23, 24, 26] #List of pins on the Raspberry Pi
-    GPIO.setwarnings(False)
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BOARD)
-    for pinnum in range(0, (len(pinlist))):
-        print('Pin ' + str(pinlist[pinnum]) + ' ' + str(pinnum))
-        GPIO.setup((pinlist[pinnum]),GPIO.OUT) #Disables each pin one at a time
-        GPIO.output((pinlist[pinnum]), False)
-    GPIO.cleanup()
+    if GpioFound:
+        pinlist = [3, 5, 7, 11, 12, 13, 15, 16, 18, 19, 21, 22, 23, 24, 26] #List of pins on the Raspberry Pi
+        GPIO.setwarnings(False)
+        GPIO.cleanup()
+        GPIO.setmode(GPIO.BOARD)
+        for pinnum in range(0, (len(pinlist))):
+            print('Pin ' + str(pinlist[pinnum]) + ' ' + str(pinnum))
+            GPIO.setup((pinlist[pinnum]),GPIO.OUT) #Disables each pin one at a time
+            GPIO.output((pinlist[pinnum]), False)
+        GPIO.cleanup()
 
 def flasher():
-    GPIO.setwarnings(False)
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(11,GPIO.OUT)
-    GPIO.output(11,True)
-    sleep(1)
-    GPIO.output(11,False)
+    if GpioFound:
+        GPIO.setwarnings(False)
+        GPIO.cleanup()
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(11,GPIO.OUT)
+        GPIO.output(11,True)
+        sleep(1)
+        GPIO.output(11,False)
+    else:
+        print(GpioFound)
 
 def pingreplyer(lastping, Server_dead_timeout):
+    global conn
     HOST = ''  
     PORT = 50008
     #s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -142,11 +150,11 @@ def pingreplyer(lastping, Server_dead_timeout):
         try:
             conn, addr = s.accept()
             #print 'Connected by', addr
-            print('Pinged by server at ' + str(addr[0]))
+            print('Pinged by server at ' + str(addr[0]) + ' at ' + str(datetime.now().strftime('%H:%M:%S')))
             sleep(0.05)
             data = json.loads(conn.recv(1024))
             if not data: break
-            print(data[0])
+            #print(data[0])
             #print(data[1])
             if data[0] == 'Ping':
                 conn.sendall(json.dumps(('Alive',str(getserial()))))
@@ -177,6 +185,7 @@ def pingreplyer(lastping, Server_dead_timeout):
             print('')
             outloopdone = True
     try:
+        assert isinstance(conn, object)
         conn.close()
         print('Ping 1 conn closed')
     except:
@@ -197,6 +206,10 @@ def broadcastfinder():
     #print (data + " " + repr(wherefrom[0]))
     return(wherefrom[0])
 
+
+#---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
+
+
 #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 lastping = int(time())
 while 1:
@@ -204,7 +217,13 @@ while 1:
         serverip = broadcastfinder()
         lastping = register(serverip)
         lastping = pingreplyer(lastping, Server_dead_timeout)
-    except: # (not KeyboardInterrupt):
+
+    except:
+        break
+
+
+
+""" except: # (not KeyboardInterrupt):
         print('************************************')
         print("System error...")
         traceback.print_exc(file=sys.stdout) #Prints out traceback error
@@ -212,4 +231,4 @@ while 1:
         print("")
         sleep(1)
         print("RESTARTING")
-        sleep(3)
+        sleep(3) """
