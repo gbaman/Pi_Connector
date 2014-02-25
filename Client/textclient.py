@@ -1,5 +1,14 @@
 import os, socket, json, getpass
 from time import sleep
+import traceback
+import sys
+from logging import debug, info, warning, basicConfig, INFO, DEBUG, WARNING
+
+
+basicConfig(level=WARNING)
+
+ServerIP = ""
+
 
 def clearer():
     #Simple function that clears the screen
@@ -36,13 +45,18 @@ def startupimage2():
 
     
 def broadcastfinder():
+    global ServerIP
     print('Searching for server....')
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(('', 50010))
     data, wherefrom = s.recvfrom(1500, 0)
     #print (data + " " + repr(wherefrom[0]))
+    ServerIP = wherefrom[0]
     return(wherefrom[0])
 
+def lineMaker(lines):
+    for i in range(0, lines):
+        print("")
 
 def grablist(ipaddress): #Job is to grab the list off the server of connected clients
     global mainToken
@@ -58,23 +72,33 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             s.connect((host,port))
             s.send(json.dumps((message, "", mainToken)))
             waiting = True
+            s.close()
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sleep(0.05)
+            s.bind(('', 50009))
+            s.listen(2)
+            conn, addr = s.accept()
             while waiting == True:
-                data = s.recv(size)
+                data = conn.recv(1024)
                 if data:
                     #print('data is ' + str(data))
                     data = json.loads(data)
+                    conn.close()
                     s.close()
                     gotdata = True
                     waiting = False
+                    #print(data)
+
                     return data[0]
                 else:
-                    print('waiting for data..')
+                    warning('waiting for data..')
                     sleep(0.2)
         except socket.error:
-            print('Can not find server, trying again')
+            warning('Can not find server, trying again')
             sleep(2)
+            traceback.print_exc(file=sys.stdout)
 
-def transmiter(message, ip, payload = None, port = 50008):
+def transmiter(message, ip, payload = None, port = 50008, raw = False):
     global mainToken
     #port = 50008
     #print('---------')
@@ -83,11 +107,14 @@ def transmiter(message, ip, payload = None, port = 50008):
     #print('---------')
     size = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print((ip,port))
+    #print((ip,port))
     s.connect((ip,port))
     #print("Sending")
     #print((json.dumps((message, payload))))
-    s.send(json.dumps((message, payload, mainToken)))
+    if raw:
+        s.send(json.dumps(message))
+    else:
+        s.send(json.dumps((message, payload, mainToken)))
     sleep(0.2)
     s.close()
 
@@ -101,11 +128,12 @@ def transmiterReturn(message, ip, payload = None, port = 50008):
     #print('---------')
     size = 1024
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print((ip,port))
+    #print((ip,port))
     s.connect((ip,port))
     #print("Sending")
     #print((json.dumps((message, payload))))
     s.send(json.dumps((message, payload, mainToken)))
+    debug(json.dumps((message, payload, mainToken)))
     data = s.recv(size)
     if data:
         #print('data is ' + str(data))
@@ -115,8 +143,27 @@ def transmiterReturn(message, ip, payload = None, port = 50008):
         waiting = False
         return data[0]
     else:
-        print('waiting for data..')
+        warning('waiting for data..')
         sleep(0.2)
+
+def transmiterListen(port):
+    global mainToken
+    size = 1024
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("0.0.0.0", port))
+    info("Socket bound!")
+    s.listen(5)
+    conn, addr = s.accept()
+    debug(addr)
+    data = conn.recv(1024)
+    conn.close()
+    s.close()
+    data = json.loads(data)
+    #print("The data is " + str(data))
+    #print(data[0][1])
+    return data[0][1]
+
+
 
 def grouper(ip):
     MenuRun = True
@@ -137,14 +184,14 @@ class LoginC():
             credentials =  self.details()
             self.token = transmiterReturn("Token", self.serverIP, credentials, 50000)
             if (int(self.token) == 0):
-                print("")
+                print("\n"*10)
                 print("---------------------")
                 print("Incorrect credentials")
                 print("---------------------")
                 print("")
             else:
                 success = True
-        print("Token is " + str(self.token))
+        debug("Token is " + str(self.token))
         global mainToken
         mainToken = self.token
 
@@ -152,10 +199,10 @@ class LoginC():
 
     def details(self):
         print("Please enter your username")
-        username = raw_input()
+        username = (raw_input()).lower()
         print("Please enter password")
         password = getpass.getpass()
-        print(password)
+        debug(password)
         return ((username, password))
 
 
@@ -223,46 +270,103 @@ def ipmenu(ip, serverIP):
             #print("The server IP is " + str(ip))
             transmiter(message, ip)
             
-        
+# Server relay communications - (Relay, (Message, (Payload)), Token, (Recipients)
+
+
+def clientMenu(ip, serverIP, MenuName = "FeatureList"):
+    global mainToken
+    lineMaker(3)
+    debug(login.token)
+    #print("IP is "+str(ip))
+    piIp = ip
+    transmiter(MenuName, serverIP, None, 50000)
+    menuList = (transmiterListen(50010))
+    #print("Menulist is "+ str(menuList))
+    menurun = True
+    if menuList == []:
+        print("You have no permissions for this client")
+        sleep(3)
+    while menurun == True:
+        print('What would you like to do with this Raspberry Pi?')
+        print('Currently connected to ' + str(piIp))
+        print('')
+        for count in range(1, len(menuList)+1):
+            print(str(count) + ". " + str(menuList[count-1][1]))
+        answer = raw_input()
+        try:
+            answer = int(answer)
+        except:
+            print("Invalid value supplied")
+            sleep(2)
+            continue
+
+
+        menurun = menuInterpreter(menuList, answer, piIp, serverIP)
+        #Interpreter
+def menuInterpreter(menuList, answer, piIp, serverIP):
+        if answer in range(1, len(menuList)+1):
+            requested = answer -1
+            if menuList[requested][2] == "Exit":
+                return False
+            if menuList[requested][2] == "ClientMenu":
+                clientMenu(menuList[requested][1],serverIP)
+                return False
+            if (not (menuList[requested][3] == False)):
+                print(menuList[requested][3])
+                secondResponse = raw_input()
+            else:
+                secondResponse = ""
+            if (menuList[requested][2] == "pi") or (menuList[requested][2] == "server"):
+                tosend = ["", ["", []], mainToken, []]
+                if (menuList[requested][2] == "pi"):
+                    tosend[0] = "Relay"
+                    tosend[3] = [piIp, ]
+                    tosend[1][0] = menuList[requested][4]
+                    #print(tosend)
+                    transmiter(tosend, serverIP, None, 50000, True)
+
+                elif (menuList[requested][2] == "server"):
+                    message = ((secondResponse, piIp))
+                    transmit = False
+                    transmiter(menuList[requested][4], serverIP, message,  50000)
+
+                else:
+                    pass
+
+
+                return False
+
 
 def menu(clientlist, ipaddress):
-    clientlist = grablist(ipaddress)
-    clearer()
-    print('Shrimpy classroom management text client')
-    print('')
-    print('1. Refresh')
-    print('2. Reboot all robots')
-    print('3. Shut down all robots')
-    print('4. Kill all GPIO pins')
-    print('')
-    print('Connected Raspberry Pis')
-    #print(clientlist)
-    for clientnum in range(0, len(clientlist)):
-        print(str(clientnum + 5) + '. ' + clientlist[clientnum][0] + ' - ' + str(clientlist[clientnum][2]))
-    answer = raw_input()
-
-
-    if answer == '1':
+    while True:
         clientlist = grablist(ipaddress)
-    elif answer == '2':
-        for clientnum in range(0, len(clientlist)):
-          transmiter('Reboot', clientlist[clientnum])
-
-    elif answer == '3':
-        for clientnum in range(0, len(clientlist)):
-          transmiter('Shutdown', clientlist[clientnum])
-    elif answer == '4':
-        for clientnum in range(0, len(clientlist)):
-          print(clientnum)
-          print(clientlist[clientnum])
-          transmiter('GPIOoff', clientlist[clientnum][0])
-            
-    elif (not(int(answer) == 1)) and ((int(answer) - 4) < (len(clientlist)+1)):
-        print('Valid')
-        ipmenu(clientlist[(int(answer) -6 )][0], ipaddress)
+        clearer()
+        lineMaker(3)
+        print('Raspberry Pi Classroom Management Text Client')
+        print('----------------------------------------')
+        print('')
+        clientlist = clientlist[1]
+        clientIPs = clientlist[1]
+        menuOption = clientlist[0]
 
 
-    menu(clientlist, ipaddress)
+        for clientnum in range(0, len(menuOption)):
+            print(str(clientnum + 1) + ". " + menuOption[clientnum][1])
+        print("")
+        print('Connected Raspberry Pis')
+        print('-----------------------')
+
+
+        for clientnum in range(0, len(clientIPs)):
+            print(str(clientnum + len(menuOption) + 1) + ". " + clientIPs[clientnum][1])
+        answer = raw_input()
+
+        fullMenu = menuOption + clientIPs
+
+        answer = int(answer)
+        menuInterpreter(fullMenu, answer, 0, ipaddress)
+
+
 
 
 startupimage2()
