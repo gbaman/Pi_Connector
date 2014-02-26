@@ -15,6 +15,7 @@ def clearer():
     os.system('cls' if os.name=='nt' else 'clear')
 
 mainToken = 0
+allClients = []
 
 def startupimage2():
     clearer()
@@ -48,7 +49,7 @@ def broadcastfinder():
     global ServerIP
     print('Searching for server....')
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.bind(('', 50010))
+    s.bind(('', 50011))
     data, wherefrom = s.recvfrom(1500, 0)
     #print (data + " " + repr(wherefrom[0]))
     ServerIP = wherefrom[0]
@@ -74,7 +75,7 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             waiting = True
             s.close()
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sleep(0.05)
+            sleep(0.005)
             s.bind(('', 50009))
             s.listen(2)
             conn, addr = s.accept()
@@ -115,7 +116,7 @@ def transmiter(message, ip, payload = None, port = 50008, raw = False):
         s.send(json.dumps(message))
     else:
         s.send(json.dumps((message, payload, mainToken)))
-    sleep(0.2)
+    sleep(0.05)
     s.close()
 
 
@@ -304,9 +305,12 @@ def clientMenu(ip, serverIP, MenuName = "FeatureList"):
         menurun = menuInterpreter(menuList, answer, piIp, serverIP)
         #Interpreter
 def menuInterpreter(menuList, answer, piIp, serverIP):
+        global allClients
         if answer in range(1, len(menuList)+1):
             requested = answer -1
             if menuList[requested][2] == "Exit":
+                return False
+            if menuList[requested][2] == "Refresh":
                 return False
             if menuList[requested][2] == "ClientMenu":
                 clientMenu(menuList[requested][1],serverIP)
@@ -316,20 +320,32 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
                 secondResponse = raw_input()
             else:
                 secondResponse = ""
+            if (menuList[requested][2][0] == "all"):
+                allC = True
+                menuList[requested][2] = menuList[requested][2][1]
+            else:
+                allC = False
+
             if (menuList[requested][2] == "pi") or (menuList[requested][2] == "server"):
                 tosend = ["", ["", []], mainToken, []]
                 if (menuList[requested][2] == "pi"):
                     tosend[0] = "Relay"
-                    tosend[3] = [piIp, ]
+                    if allC:
+                        tosend[3] = allClients
+                    else:
+                        tosend[3] = [piIp, ]
                     tosend[1][0] = menuList[requested][4]
                     #print(tosend)
                     transmiter(tosend, serverIP, None, 50000, True)
 
                 elif (menuList[requested][2] == "server"):
                     message = ((secondResponse, piIp))
+                    if allC:
+                        message = ((secondResponse, allClients))
+                    else:
+                        message = ((secondResponse, piIp))
                     transmit = False
                     transmiter(menuList[requested][4], serverIP, message,  50000)
-
                 else:
                     pass
 
@@ -338,6 +354,7 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
 
 
 def menu(clientlist, ipaddress):
+    global allClients
     while True:
         clientlist = grablist(ipaddress)
         clearer()
@@ -347,6 +364,8 @@ def menu(clientlist, ipaddress):
         print('')
         clientlist = clientlist[1]
         clientIPs = clientlist[1]
+
+
         menuOption = clientlist[0]
 
 
@@ -358,7 +377,12 @@ def menu(clientlist, ipaddress):
 
 
         for clientnum in range(0, len(clientIPs)):
-            print(str(clientnum + len(menuOption) + 1) + ". " + clientIPs[clientnum][1])
+            print(str(clientnum + len(menuOption) + 1) + ". " + clientIPs[clientnum][1][0] + " - " + clientIPs[clientnum][1][1])
+            clientIPs[clientnum][1] = clientIPs[clientnum][1][0]
+        allClients = []
+        for i in range(0, len(clientIPs)):
+            allClients.append(clientIPs[i][1])
+
         answer = raw_input()
 
         fullMenu = menuOption + clientIPs

@@ -9,7 +9,7 @@ import hashlib
 import random
 from logging import debug, info, warning, basicConfig, INFO, DEBUG, WARNING
 
-basicConfig(level=DEBUG)
+basicConfig(level=WARNING)
 
 #Protocols
 """
@@ -29,17 +29,39 @@ Menu
 8. Reserved
 
 
+To create a command
+First define its permission level in __init__
 
+Next, pick which menu your object must be part of. If it is due to be part of the main home menu, put your function in homeMenuBuild
+If it is to be part of the Pi menu (which most will be), place it in mainBuild. These are functions that will be available for that specific Raspberry Pi.
 
+To create a function, follow the menu protocol above.
+
+Here is an example
+        if self.shutdown <= level: #First checks if the user has permission
+            value = ("", "Shutdown", "pi", False, "Shutdown", True, "None", False, "" ) #If the user does, now builds the item. The first shutdown is what appears on their screen, pi is there as it is
+            self.menu.append(value) #due to be run on a pi, as opposed to the server ("server" is also available"). Finally, the menu being sent is appended with this new information.
+
+A few things to be awear of, there are some special situations.
+Special situations
+1. For the IP addresses in homeMenuBuild, the String item (item 1), is actually another list, [Ip address, name]. Do not make use of name as it is removed clientside after it is displayed and reverted to just [ip address]
+2. Many functions have 2 permission levels, e.g. self.shutdown and self.localshutdown. If the user has permission for self.shutdown, because of the elif, local shutdown will never appear. If they dont, it will appear.
+3. There are some hardcoded in functions at the other end, stuff like "exit" which will just run homeMenuBuild. Refresh does the same thing.
+4. "ClientMenu" will load clientMenu on the clientside, aka loading a menu for a specific IP address
+5. If a command is meant to go out to "all", then the ip object [2] changes to a sublist, ["all", "pi or server"]. Later the "all" is stipped away leaving only the object in [1].
+
+Pi Side. For all these functions, if it is being added to the pi, add it to interpreter function. For example, if your function sent over the word "Reboot", on pi side you would need
+if data[0] == 'Reboot':
+    call(['sudo', 'reboot'])
+"call" runs a command in the shell of the pi.
+
+Server Side. To add a function that is run serverside, it must be added in class transmissionHandler. In this class, there is an interpreter function.
+Very similarly to the Pi side, just check if the string coming in is equal to what you expect. e.g. for "FeatureList"
+if (data[0] == "FeatureList"):
+    Do something
 """
 
-def broadcaster():
-    s = socket(AF_INET, SOCK_DGRAM)
-    s.bind(('', 0))
-    s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-    s.sendto('hello', ('<broadcast>', 50010))
-    info('Broadcasting to network my IP')
-    s.close()
+
 
 
 class clientMenu(threading.Thread):
@@ -53,7 +75,8 @@ class clientMenu(threading.Thread):
         self.menuOpt = menuOpt
         self.clientList = clientList
 
-        #--------------------------------
+        #-------------------------------- Home menu
+        self.refresh = 0
         self.allShutdown = 2
         self.allReboot = 2
         self.allGPIO = 2
@@ -66,7 +89,7 @@ class clientMenu(threading.Thread):
 
 
 
-        #--------------------------------
+        #-------------------------------- Client menu
 
         self.exit = 0
         self.shutdown = 2
@@ -92,13 +115,13 @@ class clientMenu(threading.Thread):
 
 
 # Menu drawing - (Reserved, String, IP, Response?, Response_Command, Token?, Secondary_response, Local, Reserved)
-    def mainBuild(self, level):
+    def mainBuild(self, level): # Builds the client menu
         debug("Level is " + str(level))
         if self.shutdown <= level:
             value = ("", "Shutdown", "pi", False, "Shutdown", True, "None", False, "" )
             self.menu.append(value)
 
-        if self.localShutdown <= level:
+        elif self.localShutdown <= level:
             value = ("", "Shutdown my Pi", "pi", False, "Shutdown", True, "None", True, "" )
             self.menu.append(value)
 
@@ -106,7 +129,7 @@ class clientMenu(threading.Thread):
             value = ("", "Reboot", "pi", False, "Reboot", True, "None", False, "" )
             self.menu.append(value)
 
-        if self.localReboot <= level:
+        elif self.localReboot <= level:
             value = ("", "Reboot my Pi", "pi", False, "Reboot", True, "None", True, "" )
             self.menu.append(value)
 
@@ -115,15 +138,13 @@ class clientMenu(threading.Thread):
             self.menu.append(value)
 
 
-
-
-
         if self.exit <= level:
             value = ("", "Exit", "Exit", False, "Exit", True, "None", True, "" )
             self.menu.append(value)
 
         return self.menu
 
+#------------------------------------------------------------------------------------------------------------------------
 
     def sendMainMenu(self, menuList):
         sleep(0.3)
@@ -135,29 +156,58 @@ class clientMenu(threading.Thread):
         s = sender((self.ip,), ("HomeDraw", menuList, "1"), 50009, 1)
         s.run()
 
+#------------------------------------------------------------------------------------------------------------------------
 
-    def homeMenuBuild(self, level):
+    def homeMenuBuild(self, level): #Builds the home menu (first one user sees)
         debug("Level is " + str(level))
+
+        if self.refresh <= level:
+            value = ("", "Refresh", "pi", False, "Refresh", True, "None", False, "" )
+            self.menu.append(value)
+
         if self.allShutdown <= level:
-            value = ("", "Shutdown all Pis", "all", False, "Shutdown", True, "None", False, "" )
+            value = ("", "Shutdown all Pis", ["all", "pi"], False, "Shutdown", True, "None", False, "" )
             self.menu.append(value)
 
         if self.allReboot <= level:
-            value = ("", "Reboot all Pis", "all", False, "Reboot", True, "None", False, "" )
+            value = ("", "Reboot all Pis", ["all", "pi"], False, "Reboot", True, "None", False, "" )
             self.menu.append(value)
 
         for count in range(0, len(self.clientList)):
             if (self.viewAccessAllPis <= level):
-                value = ("", self.clientList[count][0], "ClientMenu", False, "ClientMenu", True, "None", False, "" )
+                if (self.ip == self.clientList[count][0]): #If the client running on this Raspberry Pi?
+                    value = ("", [self.clientList[count][0],self.clientList[count][2] + " - *"] , "ClientMenu", False, "ClientMenu", True, "None", False, "" )
+                else: #If the client isnt owned by this user
+                    value = ("", [self.clientList[count][0],self.clientList[count][2]], "ClientMenu", False, "ClientMenu", True, "None", False, "" )
                 self.ipMenu.append(value)
-        print("Menu now built, it is")
+            elif (self.viewMyPi <= level) and (self.ip == self.clientList[count][0]): #If the user is a student and only has access to his/her Raspberry Pis.
+                value = ("", [self.clientList[count][0],self.clientList[count][2] + " - *"] , "ClientMenu", False, "ClientMenu", True, "None", False, "" )
+                self.ipMenu.append(value)
+            else:
+                debug("My self ip is " + self.ip + " and clientlistIP is " + self.clientList[count][0])
+
+        debug("Menu now built, it is")
         totalMenu = [self.menu, self.ipMenu]
-        print(totalMenu)
+        debug(totalMenu)
         return totalMenu
 
 
+class broadcaster(threading.Thread):
+    def __init__(self):
+        super(broadcaster, self).__init__()
 
+    def run(self):
+        while True:
+            self.broadcaster()
+            sleep(2)
 
+    def broadcaster(self):
+        s = socket(AF_INET, SOCK_DGRAM)
+        s.bind(('', 0))
+        s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+        s.sendto('hello', ('<broadcast>', 50011))
+        info('Broadcasting to network my IP')
+        s.close()
 class console(threading.Thread):
 
     def __init__(self):
@@ -593,8 +643,8 @@ def InitalSQL(sql):
 #**********************************************************- Main program - **********************************************************
 
 
-
-while True:
+mainLoop = True
+while mainLoop:
     try:
 
         size = 1024
@@ -617,8 +667,12 @@ while True:
         print("To access control console press c and then enter")
         print("------------------------------------------------")
 
+        b = broadcaster()
+        b.daemon = True
+        b.start()
+
         while 1:
-            broadcaster()
+            #broadcaster()
             #pinger(clientlist)
             #p.pinger2(sql,sqlc)
             #clientlist = datachecker(clientlist)
@@ -629,8 +683,9 @@ while True:
         traceback.print_exc(file=sys.stdout) #Prints out traceback error
         print('************************************')
         print("")
-        print("Hit any key to proceed")
-        raw_input()
-        print("RESTARTING")
-        sleep(3)
+        mainLoop = False
+        #print("Hit any key to proceed")
+        #raw_input()
+        #print("RESTARTING")
+        #sleep(3)
 

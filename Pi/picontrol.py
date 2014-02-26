@@ -75,10 +75,10 @@ def register(serverip):
 def interpreter(data, ip):
     if data[0] == 'Reboot':
         print('Rebooting')
-        call(['sudo', 'reboot'])
+        #call(['sudo', 'reboot'])
     elif data[0] == 'Shutdown':
         print('Shutting down')
-        call(['sudo', 'halt'])
+        #call(['sudo', 'halt'])
     elif data[0] == 'Scratch':
         print('Activating scratch')
         p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
@@ -98,6 +98,7 @@ def interpreter(data, ip):
         #call(['raspivid', '-t', '999999',  '-h', '720', '-w', '1080', '-fps', '25', '-hf', '-b', '2000000', '-o', '-', '|', 'gst-launch-1.0', '-v', 'fdsrc', '!', 'h264parse', '!',  'rtph264pay', 'config-interval=1', 'pt=96', '!', 'gdppay', '!', 'tcpserversink', 'host=10.0.5.167', 'port=5000'])
     else:
         print('Invalid message')
+        print(data)
 
 
 
@@ -154,29 +155,13 @@ def pingreplyer(lastping, Server_dead_timeout):
             sleep(0.05)
             data = json.loads(conn.recv(1024))
             if not data: break
-            #print(data[0])
-            #print(data[1])
             if data[0] == 'Ping':
                 conn.sendall(json.dumps(('Alive',str(getserial()))))
                 lastping = time()
             else:
                 interpreter(data, addr)
-            #conn.close()
-            #print('Print ping 1 conn closed')
-            #s.close()
-            #print('Print ping 1 s closed')
         except timeout:
-            #try:
-                #print('Timed out, oh dear....')
-                #conn.close()
-                #print('Print ping 2 conn closed')
-                #s.close()
-                #print('Print ping 2 s closed')
-            #except UnboundLocalError:
-                #s.close()
-                #print('Print ping 2 s closed')
             pass
-        #print((time() - lastping))
         if (time() - lastping > Server_dead_timeout):
             print('')
             print('-------------------------------------------------------------------------')
@@ -201,7 +186,7 @@ def pingreplyer(lastping, Server_dead_timeout):
 def broadcastfinder():
     print('Searching for server...')
     s = socket(AF_INET, SOCK_DGRAM)
-    s.bind(('', 50010))
+    s.bind(('', 50011))
     data, wherefrom = s.recvfrom(1500, 0)
     #print (data + " " + repr(wherefrom[0]))
     return(wherefrom[0])
