@@ -11,12 +11,15 @@ from subprocess import Popen, call
 import threading
 import json
 from datetime import datetime
+import os.path
 try:
     import RPi.GPIO as GPIO
     GpioFound = True
 except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
     GpioFound = False
+
+
 
 def getserial():
   # Extract serial from cpuinfo file to return
@@ -73,21 +76,16 @@ def register(serverip):
     #print(data[1])
 
 def interpreter(data, ip):
+    global screenLock
     if data[0] == 'Reboot':
         print('Rebooting')
-        #call(['sudo', 'reboot'])
+        call(['sudo', 'reboot'])
     elif data[0] == 'Shutdown':
         print('Shutting down')
-        #call(['sudo', 'halt'])
+        call(['sudo', 'halt'])
     elif data[0] == 'Scratch':
         print('Activating scratch')
         p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
-        #global scratchstat
-        #scratchstat = '1'
-        #transmiter('scratchactive', ip)
-        #p.kill()
-    elif data[0] == 'Name':
-        print('Feature not implemented yet')
     elif data[0] == 'LED':
         print('LEDs lighting')
         #flasher()
@@ -95,7 +93,11 @@ def interpreter(data, ip):
         allpinsoff()
     elif data[0] == 'CameraFeed':
         call(['raspivid -t 999999 -h 720 -w 1080 -fps 25 -hf -b 2000000 -o - | gst-launch-1.0 -v fdsrc ! h264parse !  rtph264pay config-interval=1 pt=96 ! gdppay ! tcpserversink host=192.168.1.3 port=5000'])
-        #call(['raspivid', '-t', '999999',  '-h', '720', '-w', '1080', '-fps', '25', '-hf', '-b', '2000000', '-o', '-', '|', 'gst-launch-1.0', '-v', 'fdsrc', '!', 'h264parse', '!',  'rtph264pay', 'config-interval=1', 'pt=96', '!', 'gdppay', '!', 'tcpserversink', 'host=10.0.5.167', 'port=5000'])
+    elif data[0] == "ScreenLock":
+        pass
+    elif data[0] == "ScreenUnlock":
+        pass
+
     else:
         print('Invalid message')
         print(data)
@@ -179,8 +181,20 @@ def pingreplyer(lastping, Server_dead_timeout):
     print('Ping 2 conn closed')
     return(lastping)
     
-    
-
+class mainC(threading.Thread):
+    def __init__(self):
+        super(mainC, self).__init__()
+    def run(self):
+        self.mainController()
+    def mainController(self):
+        lastping = int(time())
+        while 1:
+            try:
+                serverip = broadcastfinder()
+                lastping = register(serverip)
+                lastping = pingreplyer(lastping, Server_dead_timeout)
+            except:
+                break
 
 
 def broadcastfinder():
@@ -191,21 +205,23 @@ def broadcastfinder():
     #print (data + " " + repr(wherefrom[0]))
     return(wherefrom[0])
 
+def fetchLibs():
+    if not os.path.isfile("lock-screen"):
+        call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lockscreen-20110927210214-xi0yyacred1dmjl5-40/lock-screen'])
+        call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lock.svg-20110927210214-xi0yyacred1dmjl5-41/lock.svg'])
+
 
 #---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
 
 
 #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-lastping = int(time())
-while 1:
-    try:
-        serverip = broadcastfinder()
-        lastping = register(serverip)
-        lastping = pingreplyer(lastping, Server_dead_timeout)
 
-    except:
-        break
-
+#threading.Thread(mainController())
+fetchLibs()
+m = mainC()
+#m.daemon = True
+#m.start()
+m.run()
 
 
 """ except: # (not KeyboardInterrupt):

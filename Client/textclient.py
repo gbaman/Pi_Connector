@@ -3,6 +3,8 @@ from time import sleep
 import traceback
 import sys
 from logging import debug, info, warning, basicConfig, INFO, DEBUG, WARNING
+import Tkinter, tkFileDialog
+from subprocess import call
 
 
 basicConfig(level=WARNING)
@@ -22,23 +24,22 @@ def startupimage2():
     #Everyone loves awesome ASCII art!
     print('''
 
-   _____ _          _                       
-  / ____| |        (_)                          .~~.   .~~.
- | (___ | |__  _ __ _ _ __ ___  _ __  _   _    '. \ ' ' / .'
-  \___ \| '_ \| '__| | '_ ` _ \| '_ \| | | |    .~ .~~~..~. 
-  ____) | | | | |  | | | | | | | |_) | |_| |   : .~.'~'.~. :
- |_____/|_| |_|_|  |_|_| |_| |_| .__/ \__, |  ~ (   ) (   ) ~ 
-                               | |     __/ | ( : '~'.~.'~' : )
-                               |_|    |___/   ~ .~ (   ) ~. ~
-                                               (  : '~' :  )
-                                                '~ .~~~. ~'
-                                                    '~'
-   _____            _             _ _           
-  / ____|          | |           | | |          
- | |     ___  _ __ | |_ _ __ ___ | | | ___ _ __ 
+  _____           _____ _
+ |  __ \         |  __ (_)         .~~.   .~~.
+ | |__) |__ _ ___| |__) |         '. \ ' ' / .'
+ |  _  // _` / __|  ___/ |         .~ .~~~..~.
+ | | \ \ (_| \__ \ |   | |        : .~.'~'.~. :
+ |_|  \_\__,_|___/_|   |_|       ~ (   ) (   ) ~
+                                ( : '~'.~.'~' : )
+                                 ~ .~ (   ) ~. ~
+                                  (  : '~' :  )
+                                   '~ .~~~. ~'
+   _____            _             _ _  '~'
+  / ____|          | |           | | |
+ | |     ___  _ __ | |_ _ __ ___ | | | ___ _ __
  | |    / _ \| '_ \| __| '__/ _ \| | |/ _ | '__|
- | |___| (_) | | | | |_| | | (_) | | |  __| |   
-  \_____\___/|_| |_|\__|_|  \___/|_|_|\___|_| 
+ | |___| (_) | | | | |_| | | (_) | | |  __| |
+  \_____\___/|_| |_|\__|_|  \___/|_|_|\___|_|
 
     ''')
     sleep(2)
@@ -58,6 +59,47 @@ def broadcastfinder():
 def lineMaker(lines):
     for i in range(0, lines):
         print("")
+
+
+def submitFile():
+    root = Tkinter.Tk()
+    root.withdraw()
+    file_path = tkFileDialog.askopenfilename()
+    return file_path
+
+
+def ftpDrop(serverIP):
+    os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
+    filename = submitFile()
+    file = open("ftper", "w")
+    #print("about to write")
+    file.write("""#!/bin/bash
+ftp -n -i $1 <<EOF
+user anonymous " "
+binary
+cd handin
+put $2 $3
+EOF""")
+    file.close()
+    #print("about to call")
+    #print(filename)
+    #print(serverIP)
+    #print(os.path.basename(filename))
+    thing = call(["sh", "ftper", serverIP, filename, os.path.basename(filename)])
+    print(thing)
+    print(thing)
+    #print("called")
+    call(["rm", "ftper"])
+
+
+
+
+def askForFile():
+    pass
+    #Tk().withdraw()
+    #filename = askopenfilename()
+    #return filename
+
 
 def grablist(ipaddress): #Job is to grab the list off the server of connected clients
     global mainToken
@@ -308,6 +350,9 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
         global allClients
         if answer in range(1, len(menuList)+1):
             requested = answer -1
+
+            #----------------------Custom Functions-------------------
+
             if menuList[requested][2] == "Exit":
                 return False
             if menuList[requested][2] == "Refresh":
@@ -315,6 +360,12 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
             if menuList[requested][2] == "ClientMenu":
                 clientMenu(menuList[requested][1],serverIP)
                 return False
+            if menuList[requested][4] == "GetFile":
+                print("submit file")
+                ftpDrop(serverIP)
+
+            #----------------------Custom Functions End---------------
+
             if (not (menuList[requested][3] == False)):
                 print(menuList[requested][3])
                 secondResponse = raw_input()
@@ -335,7 +386,7 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
                     else:
                         tosend[3] = [piIp, ]
                     tosend[1][0] = menuList[requested][4]
-                    #print(tosend)
+                    pass
                     transmiter(tosend, serverIP, None, 50000, True)
 
                 elif (menuList[requested][2] == "server"):
@@ -386,8 +437,10 @@ def menu(clientlist, ipaddress):
         answer = raw_input()
 
         fullMenu = menuOption + clientIPs
-
-        answer = int(answer)
+        try:
+            answer = int(answer)
+        except:
+            continue
         menuInterpreter(fullMenu, answer, 0, ipaddress)
 
 

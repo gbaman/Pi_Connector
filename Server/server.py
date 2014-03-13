@@ -59,6 +59,7 @@ Server Side. To add a function that is run serverside, it must be added in class
 Very similarly to the Pi side, just check if the string coming in is equal to what you expect. e.g. for "FeatureList"
 if (data[0] == "FeatureList"):
     Do something
+
 """
 
 
@@ -73,7 +74,7 @@ class clientMenu(threading.Thread):
         self.ip = ip
         self.level = level
         self.menuOpt = menuOpt
-        self.clientList = clientList
+        self.clientList = listit(clientList)
 
         #-------------------------------- Home menu
         self.refresh = 0
@@ -82,10 +83,15 @@ class clientMenu(threading.Thread):
         self.allGPIO = 2
         self.allScreenShare = 2
         self.allBlankScreen = 2
+        self.allUnblankScreen = 2
+        self.allSendCommand = 2
+
 
 
         self.viewAccessAllPis = 2
         self.viewMyPi = 1
+        self.uploadFile = 1
+        self.changePassword = 1
 
 
 
@@ -103,6 +109,7 @@ class clientMenu(threading.Thread):
         self.GPIO = 2
         self.addToGroup = 2
         self.resetPassword = 2
+        self.sendCommand = 2
 
         #--------------------------------
 
@@ -173,7 +180,29 @@ class clientMenu(threading.Thread):
             value = ("", "Reboot all Pis", ["all", "pi"], False, "Reboot", True, "None", False, "" )
             self.menu.append(value)
 
+        if self.allBlankScreen <= level:
+            value = ("", "Lock all screens", ["all", "pi"], False, "ScreenLock", True, "None", False, "" )
+            self.menu.append(value)
+
+        if self.allUnblankScreen <= level:
+            value = ("", "Unlock all screens", ["all", "pi"], False, "ScreenUnlock", True, "None", False, "" )
+            self.menu.append(value)
+
+        if self.allSendCommand <= level:
+            value = ("", "Send command to all pis", ["all", "pi"], "Enter command", "BatchCommand", True, "None", False, "" )
+            self.menu.append(value)
+
+        if self.changePassword <= level:
+            value = ("", "Change your password", "server", "Please enter your new password", "Password", True, "None", False, "" )
+            self.menu.append(value)
+
         for count in range(0, len(self.clientList)):
+            print("self.clientList[count][2] is " + str(self.clientList[count][2]))
+            print(count)
+            print(self.clientList)
+            if self.clientList[count][2] == None:
+                self.clientList[count][2] = ""
+
             if (self.viewAccessAllPis <= level):
                 if (self.ip == self.clientList[count][0]): #If the client running on this Raspberry Pi?
                     value = ("", [self.clientList[count][0],self.clientList[count][2] + " - *"] , "ClientMenu", False, "ClientMenu", True, "None", False, "" )
@@ -185,6 +214,11 @@ class clientMenu(threading.Thread):
                 self.ipMenu.append(value)
             else:
                 debug("My self ip is " + self.ip + " and clientlistIP is " + self.clientList[count][0])
+
+        if self.uploadFile <= level:
+            value = ("", "Submit a file", "local", False, "GetFile", True, "None", False, "" )
+            self.menu.append(value)
+
 
         debug("Menu now built, it is")
         totalMenu = [self.menu, self.ipMenu]
@@ -218,6 +252,27 @@ class console(threading.Thread):
             if response == "c":
                 response = ""
                 self.cMenu()
+
+    def sort(self, array):
+        less = []
+        equal = []
+        greater = []
+
+        if len(array) > 1:
+            pivot = array[0]
+            for x in array:
+                if x < pivot:
+                    less.append(x)
+                if x == pivot:
+                    equal.append(x)
+                if x > pivot:
+                    greater.append(x)
+            return self.sort(less)+self.sort(equal)+self.sort(greater)
+        else:
+            return array
+
+
+
     def cMenu(self):
         sqlU = sqlite3.connect('Pi-control.db')
         sqlUc = sqlU.cursor()
@@ -284,6 +339,8 @@ class console(threading.Thread):
         table = sqlUc.fetchall()
         print("ID : Name - Permission level")
         print("-----------------------")
+        for i in range(0, len(table)):
+            pass
         for count in range(0, len(table)):
             #print(str(table[count]))
             print(str(table[count][0]) + " : " + str(table[count][1]) + " - " + str(self.userperm(table[count][2])))
@@ -442,15 +499,29 @@ class transmissionHandler(threading.Thread):
             sqld.execute("""UPDATE Metadata SET Name = ? WHERE Serial = ?""",d)
             sql.commit()
             sql.close()
-        if (data[0] == "FeatureList"):
+        elif (data[0] == "FeatureList"):
             MenuMake = clientMenu(self.ip, checkToken(data[2]))
             MenuMake.run()
-        if (data[0] == "Relay"):
+        elif (data[0] == "Relay"):
             print("Relay data arrived!")
+            print(data)
             print(data[1][1])
             if data[1][1] == []:
                 s = sender(data[3], (data[1][0]))
                 s.run()
+        elif (data[0] == "Password"):
+
+            print("new password is " + data[1][0])
+            sqld = sql.cursor()
+            sqld.execute("""SELECT UserID FROM User WHERE Token  = ? """,(data[2],))
+            ID = sqld.fetchone()
+            hashresult = createHash(data[1][0])
+            sqld.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "Token" = ?""",(str(hashresult[0]), str(hashresult[1]), data[2]))
+            sql.commit()
+            sql.close()
+
+
+
 
 #-------------------------------------------END OF transmissionHandler CLASS-------------------------------------------
 
@@ -464,6 +535,12 @@ def wait():
     raw_input("Press any key to continue..")
     print("")
 
+def listit(t):
+    if isinstance(t, (list, tuple)):
+        return list(map(listit, t))
+    else:
+        return t
+
 
 def randomDigits(digits):
     lower = 10**(digits-1)
@@ -475,6 +552,7 @@ def randomDigits(digits):
 
 def createHash(password):
     salt = randomDigits(32)
+    print("The salt is "+ str(salt))
     hashResult = hashlib.sha512(str(salt) + str(password)).hexdigest()
     return (salt, hashResult)
 
