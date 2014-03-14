@@ -2,15 +2,24 @@
 
 Server_dead_timeout = 23 #In seconds
 
-
+import traceback
+import sys
 from time import sleep
 from time import time
 from socket import *
 from subprocess import Popen, call
+import threading
+import json
+from datetime import datetime
+import os.path
 try:
     import RPi.GPIO as GPIO
+    GpioFound = True
 except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
+    GpioFound = False
+
+
 
 def getserial():
   # Extract serial from cpuinfo file to return
@@ -26,15 +35,31 @@ def getserial():
 
   return cpuserial
 
+
+def transmiter(message, ip, payload = None, expecting = False, port = 50008):
+    #port = 50008
+    size = 1024
+    s = socket(AF_INET, SOCK_STREAM)
+    print((ip,port))
+    s.connect((ip,port))
+    s.send(json.dumps(message, payload))
+    sleep(0.2)
+    if expecting:
+        data = json.loads(s.recv(size))
+        return data
+    else:
+        return None
+    s.close()
+
 def register(serverip):
-    message = 'Register:' + str(getserial())
+    message = ('Register', str(getserial()))
     host = serverip
     port = 50000
     size = 1024
     s = socket(AF_INET, SOCK_STREAM)
     s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
     s.connect((host,port))
-    s.send(message)
+    s.send(json.dumps(message))
     data = s.recv(size)
     s.close()
     print('Register socket closed')
@@ -51,55 +76,60 @@ def register(serverip):
     #print(data[1])
 
 def interpreter(data, ip):
-    if data == 'Reboot':
+    global screenLock
+    if data[0] == 'Reboot':
         print('Rebooting')
         call(['sudo', 'reboot'])
-    elif data == 'Shutdown':
+    elif data[0] == 'Shutdown':
         print('Shutting down')
         call(['sudo', 'halt'])
-    elif data == 'Scratch':
+    elif data[0] == 'Scratch':
         print('Activating scratch')
         p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
-        #global scratchstat
-        #scratchstat = '1'
-        #transmiter('scratchactive', ip)
-        #p.kill()
-    elif data[0:3] == 'Name':
-        print('Feature not implemented yet')
-    elif data == 'LED':
+    elif data[0] == 'LED':
         print('LEDs lighting')
-        flasher
-    elif data == 'GPIOoff':
+        #flasher()
+    elif data[0] == 'GPIOoff':
         allpinsoff()
-    elif data == 'CameraFeed':
+    elif data[0] == 'CameraFeed':
         call(['raspivid -t 999999 -h 720 -w 1080 -fps 25 -hf -b 2000000 -o - | gst-launch-1.0 -v fdsrc ! h264parse !  rtph264pay config-interval=1 pt=96 ! gdppay ! tcpserversink host=192.168.1.3 port=5000'])
-        #call(['raspivid', '-t', '999999',  '-h', '720', '-w', '1080', '-fps', '25', '-hf', '-b', '2000000', '-o', '-', '|', 'gst-launch-1.0', '-v', 'fdsrc', '!', 'h264parse', '!',  'rtph264pay', 'config-interval=1', 'pt=96', '!', 'gdppay', '!', 'tcpserversink', 'host=10.0.5.167', 'port=5000'])
+    elif data[0] == "ScreenLock":
+        pass
+    elif data[0] == "ScreenUnlock":
+        pass
+
     else:
         print('Invalid message')
+        print(data)
 
 
 
 def allpinsoff():
-    pinlist = [3, 5, 7, 11, 12, 13, 15, 16, 18, 19, 21, 22, 23, 24, 26] #List of pins on the Raspberry Pi
-    GPIO.setwarnings(False)
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BOARD)
-    for pinnum in range(0, (len(pinlist))):
-        print('Pin ' + str(pinlist[pinnum]) + ' ' + str(pinnum))
-        GPIO.setup((pinlist[pinnum]),GPIO.OUT) #Disables each pin one at a time
-        GPIO.output((pinlist[pinnum]), False)
-    GPIO.cleanup()
+    if GpioFound:
+        pinlist = [3, 5, 7, 11, 12, 13, 15, 16, 18, 19, 21, 22, 23, 24, 26] #List of pins on the Raspberry Pi
+        GPIO.setwarnings(False)
+        GPIO.cleanup()
+        GPIO.setmode(GPIO.BOARD)
+        for pinnum in range(0, (len(pinlist))):
+            print('Pin ' + str(pinlist[pinnum]) + ' ' + str(pinnum))
+            GPIO.setup((pinlist[pinnum]),GPIO.OUT) #Disables each pin one at a time
+            GPIO.output((pinlist[pinnum]), False)
+        GPIO.cleanup()
 
 def flasher():
-    GPIO.setwarnings(False)
-    GPIO.cleanup()
-    GPIO.setmode(GPIO.BOARD)
-    GPIO.setup(11,GPIO.OUT)
-    GPIO.output(11,True)
-    sleep(1)
-    GPIO.output(11,False)
+    if GpioFound:
+        GPIO.setwarnings(False)
+        GPIO.cleanup()
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(11,GPIO.OUT)
+        GPIO.output(11,True)
+        sleep(1)
+        GPIO.output(11,False)
+    else:
+        print(GpioFound)
 
 def pingreplyer(lastping, Server_dead_timeout):
+    global conn
     HOST = ''  
     PORT = 50008
     #s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
@@ -123,30 +153,17 @@ def pingreplyer(lastping, Server_dead_timeout):
         try:
             conn, addr = s.accept()
             #print 'Connected by', addr
-            print('Pinged by server at ' + str(addr[0]))
-            data = conn.recv(1024)
+            print('Pinged by server at ' + str(addr[0]) + ' at ' + str(datetime.now().strftime('%H:%M:%S')))
+            sleep(0.05)
+            data = json.loads(conn.recv(1024))
             if not data: break
-            if data == 'Ping': 
-                conn.sendall('Alive:'+str(getserial()))
+            if data[0] == 'Ping':
+                conn.sendall(json.dumps(('Alive',str(getserial()))))
                 lastping = time()
             else:
                 interpreter(data, addr)
-            #conn.close()
-            #print('Print ping 1 conn closed')
-            #s.close()
-            #print('Print ping 1 s closed')
         except timeout:
-            #try:
-                #print('Timed out, oh dear....')
-                #conn.close()
-                #print('Print ping 2 conn closed')
-                #s.close()
-                #print('Print ping 2 s closed')
-            #except UnboundLocalError:
-                #s.close()
-                #print('Print ping 2 s closed')
             pass
-        #print((time() - lastping))
         if (time() - lastping > Server_dead_timeout):
             print('')
             print('-------------------------------------------------------------------------')
@@ -155,6 +172,7 @@ def pingreplyer(lastping, Server_dead_timeout):
             print('')
             outloopdone = True
     try:
+        assert isinstance(conn, object)
         conn.close()
         print('Ping 1 conn closed')
     except:
@@ -163,30 +181,55 @@ def pingreplyer(lastping, Server_dead_timeout):
     print('Ping 2 conn closed')
     return(lastping)
     
-    
-
+class mainC(threading.Thread):
+    def __init__(self):
+        super(mainC, self).__init__()
+    def run(self):
+        self.mainController()
+    def mainController(self):
+        lastping = int(time())
+        while 1:
+            try:
+                serverip = broadcastfinder()
+                lastping = register(serverip)
+                lastping = pingreplyer(lastping, Server_dead_timeout)
+            except:
+                break
 
 
 def broadcastfinder():
     print('Searching for server...')
     s = socket(AF_INET, SOCK_DGRAM)
-    s.bind(('', 50010))
+    s.bind(('', 50011))
     data, wherefrom = s.recvfrom(1500, 0)
     #print (data + " " + repr(wherefrom[0]))
     return(wherefrom[0])
 
+def fetchLibs():
+    if not os.path.isfile("lock-screen"):
+        call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lockscreen-20110927210214-xi0yyacred1dmjl5-40/lock-screen'])
+        call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lock.svg-20110927210214-xi0yyacred1dmjl5-41/lock.svg'])
+
+
+#---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
+
+
 #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-lastping = int(time())
-while 1:
-    try:
-        serverip = broadcastfinder()
-        lastping = register(serverip)
-        lastping = pingreplyer(lastping, Server_dead_timeout)
-    except (not KeyboardInterrupt):
+
+#threading.Thread(mainController())
+fetchLibs()
+m = mainC()
+#m.daemon = True
+#m.start()
+m.run()
+
+
+""" except: # (not KeyboardInterrupt):
         print('************************************')
         print("System error...")
+        traceback.print_exc(file=sys.stdout) #Prints out traceback error
         print('************************************')
         print("")
         sleep(1)
         print("RESTARTING")
-        sleep(3)
+        sleep(3) """
