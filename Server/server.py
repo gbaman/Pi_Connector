@@ -287,6 +287,7 @@ class console(threading.Thread):
             print("3. Modify user permission")
             print("4. Display all users and their permissions")
             print("5. Reset a users password")
+            print("6. Disable user token to allow multiple simultaneous logins")
             answer = raw_input()
             if answer == "1":
                 self.newUser(sqlU, sqlUc)
@@ -299,6 +300,8 @@ class console(threading.Thread):
                 self.displayUsers(sqlU, sqlUc, True)
             elif answer == "5":
                 self.resetPassword(sqlU, sqlUc)
+            elif answer == "6":
+                self.setTokenStatus(sqlU,sqlUc)
 
 
 
@@ -323,7 +326,7 @@ class console(threading.Thread):
                 if result == None:
                     hashresult = createHash(password1)
                     debug((username, hashresult[0], hashresult[1], level))
-                    sqlUc.execute("""INSERT INTO User VALUES(NULL,?,?,?,?, NULL)""", ((username, str(hashresult[0]), str(hashresult[1]), level)))
+                    sqlUc.execute("""INSERT INTO User VALUES(NULL,?,?,?,?, NULL, NULL)""", ((username, str(hashresult[0]), str(hashresult[1]), level)))
                     sqlU.commit()
                     print("User " + str(username) + " has been successfully added")
                     wait()
@@ -388,6 +391,15 @@ class console(threading.Thread):
             print("Password successfully changed")
             wait()
 
+    def setTokenStatus(self, sqlU, sqlUc):
+        self.displayUsers(sqlU, sqlUc)
+        print("Enter User ID to disable tokens with")
+        cID = raw_input()
+        if self.checkIfUserExists(sqlU, sqlUc, cID):
+            sqlUc.execute("""UPDATE "main"."User" SET "NoToken" = ? WHERE  "UserID" = ?""",(True, int(cID)))
+            sqlU.commit()
+            print("User updated")
+            wait()
 
     def userperm(self, value):
         value = str(value)
@@ -569,14 +581,18 @@ def decodeHash(hash, salt, password):
 
 def getToken(credentials, sql, sqlc):
     username = (credentials[0],)
-    sqlc.execute("""SELECT UserID, Username, Salt, Hash, PermissionLevel, Token FROM User WHERE Username = ? """, username)
+    sqlc.execute("""SELECT UserID, Username, Salt, Hash, PermissionLevel, Token, NoToken FROM User WHERE Username = ? """, username)
     fetch = sqlc.fetchone()
     debug(str(fetch))
     if not (fetch == None):
         sqlc.execute("""SELECT Hash, Salt FROM User WHERE Username = ? """, username)
         hashSalt = sqlc.fetchone()
+        print(str(fetch[6]))
         if (decodeHash(hashSalt[0], hashSalt[1], credentials[1])) == True:
-            return randomDigits(10)
+            if str(fetch[6]) == "1":
+                return username[0]
+            else:
+                return randomDigits(10)
         else:
             return False
     else:
@@ -688,7 +704,7 @@ Serial varchar(4) NOT NULL
     sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Metadata" ("Serial" VARCHAR PRIMARY KEY  NOT NULL  UNIQUE , "Name" VARCHAR)""")
     sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Group" ("GroupID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Name" VARCHAR NOT NULL , "Description" VARCHAR)""")
     sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."GroupConnection" ("ID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Serial" VARCHAR NOT NULL , "GroupID" INTEGER NOT NULL )""")
-    sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."User" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Username" VARCHAR NOT NULL , "Salt" VARCHAR NOT NULL , "Hash" VARCHAR NOT NULL , "PermissionLevel" INTEGER NOT NULL, "Token" INTEGER )""")
+    sqlc.execute("""CREATE TABLE IF NOT EXISTS "User" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Username" VARCHAR NOT NULL , "Salt" VARCHAR NOT NULL , "Hash" VARCHAR NOT NULL , "PermissionLevel" INTEGER NOT NULL, "Token" VARCHAR , "NoToken" BOOL DEFAULT FALSE)""")
     #sql.commit()
 
 def setupNetworking():

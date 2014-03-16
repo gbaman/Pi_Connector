@@ -226,7 +226,7 @@ class LoginC():
         while success == False:
             credentials =  self.details()
             self.token = transmiterReturn("Token", self.serverIP, credentials, 50000)
-            if (int(self.token) == 0):
+            if ((str(self.token)) == "0"):
                 print("\n"*10)
                 print("---------------------")
                 print("Incorrect credentials")
