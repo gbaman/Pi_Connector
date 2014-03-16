@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/python
 
 Server_dead_timeout = 23 #In seconds
 
