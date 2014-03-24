@@ -26,6 +26,7 @@ class backgroundLock(threading.Thread):
     def __init__(self):
         super(backgroundLock, self).__init__()
     def run(self):
+        os.chdir(os.path.dirname(sys.argv[0]))
         call(["export $(sh get-display) && python lock-screen"], shell=True)
 
 
@@ -241,11 +242,13 @@ def broadcastfinder():
     return(wherefrom[0])
 
 def fetchLibs():
+    os.chdir(os.path.dirname(sys.argv[0]))
     if not os.path.isfile("lock-screen"):
-        call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lockscreen-20110927210214-xi0yyacred1dmjl5-40/lock-screen'])
-        call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lock.svg-20110927210214-xi0yyacred1dmjl5-41/lock.svg'])
+        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/lock-screen'])
+    if not os.path.isfile("lock.svg"):
+        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/lock.svg'])
     if not os.path.isfile("get-display"):
-        pass
+        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/get-display'])
 
 #---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
 
