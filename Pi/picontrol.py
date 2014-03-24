@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+active = True
 Server_dead_timeout = 23 #In seconds
 
 import traceback
@@ -7,11 +8,13 @@ import sys
 from time import sleep
 from time import time
 from socket import *
-from subprocess import Popen, call
+from subprocess import Popen, call, PIPE, STDOUT
 import threading
 import json
 from datetime import datetime
 import os.path
+import os
+import getpass
 try:
     import RPi.GPIO as GPIO
     GpioFound = True
@@ -19,6 +22,20 @@ except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
     GpioFound = False
 
+class backgroundLock(threading.Thread):
+    def __init__(self):
+        super(backgroundLock, self).__init__()
+    def run(self):
+        call(["export $(sh get-display) && python lock-screen"], shell=True)
+
+
+
+
+def getActiveUser():
+    who = Popen(['who'],stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+    result = who.stdout.read()
+    result = result.split("   ")
+    return result[0]
 
 
 def getserial():
@@ -40,7 +57,7 @@ def transmiter(message, ip, payload = None, expecting = False, port = 50008):
     #port = 50008
     size = 1024
     s = socket(AF_INET, SOCK_STREAM)
-    print((ip,port))
+    #print((ip,port))
     s.connect((ip,port))
     s.send(json.dumps(message, payload))
     sleep(0.2)
@@ -52,7 +69,7 @@ def transmiter(message, ip, payload = None, expecting = False, port = 50008):
     s.close()
 
 def register(serverip):
-    message = ('Register', str(getserial()))
+    message = ('Register', str(getserial()), str(getActiveUser()))
     host = serverip
     port = 50000
     size = 1024
@@ -77,26 +94,41 @@ def register(serverip):
 
 def interpreter(data, ip):
     global screenLock
-    if data[0] == 'Reboot':
+    if data[0][0] == 'Reboot':
         print('Rebooting')
-        call(['sudo', 'reboot'])
-    elif data[0] == 'Shutdown':
+        if active:
+            call(['sudo', 'reboot'])
+    elif data[0][0] == 'Shutdown':
         print('Shutting down')
-        call(['sudo', 'halt'])
-    elif data[0] == 'Scratch':
+        if active:
+            call(['sudo', 'halt'])
+    elif data[0][0] == 'Scratch':
         print('Activating scratch')
         p = Popen(['sudo', 'python', '/home/pi/simplesi_scratch_handler/scratch_gpio_handler2.py', str(ip[0])])
-    elif data[0] == 'LED':
+    elif data[0][0] == 'LED':
         print('LEDs lighting')
         #flasher()
-    elif data[0] == 'GPIOoff':
+    elif data[0][0] == 'GPIOoff':
         allpinsoff()
-    elif data[0] == 'CameraFeed':
+    elif data[0][0] == 'CameraFeed':
         call(['raspivid -t 999999 -h 720 -w 1080 -fps 25 -hf -b 2000000 -o - | gst-launch-1.0 -v fdsrc ! h264parse !  rtph264pay config-interval=1 pt=96 ! gdppay ! tcpserversink host=192.168.1.3 port=5000'])
-    elif data[0] == "ScreenLock":
-        pass
-    elif data[0] == "ScreenUnlock":
-        pass
+    elif data[0][0] == "ScreenLock":
+        try:
+            c = backgroundLock()
+            c.daemon = True
+            c.start()
+        except:
+            print("this command has crashed")
+    elif data[0][0] == "ScreenUnlock":
+        if active:
+            call(["pkill -f 'python lock-screen'"],shell=True)
+    elif data[0][0] == "BatchCommand":
+        try:
+            print("Running command " + str(data[0][1][0]))
+            if active:
+                call([data[0][1][0]])
+        except:
+            print("Unknown command!")
 
     else:
         print('Invalid message')
@@ -161,9 +193,11 @@ def pingreplyer(lastping, Server_dead_timeout):
                 conn.sendall(json.dumps(('Alive',str(getserial()))))
                 lastping = time()
             else:
+                #print(data)
                 interpreter(data, addr)
+                #print("interpreter done")
         except timeout:
-            pass
+            print("There has been a timeout...")
         if (time() - lastping > Server_dead_timeout):
             print('')
             print('-------------------------------------------------------------------------')
@@ -189,12 +223,13 @@ class mainC(threading.Thread):
     def mainController(self):
         lastping = int(time())
         while 1:
-            try:
-                serverip = broadcastfinder()
-                lastping = register(serverip)
-                lastping = pingreplyer(lastping, Server_dead_timeout)
-            except:
-                break
+            #try:
+            serverip = broadcastfinder()
+            lastping = register(serverip)
+            lastping = pingreplyer(lastping, Server_dead_timeout)
+            #except:
+            #    print("exception")
+            #    break
 
 
 def broadcastfinder():
@@ -209,7 +244,8 @@ def fetchLibs():
     if not os.path.isfile("lock-screen"):
         call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lockscreen-20110927210214-xi0yyacred1dmjl5-40/lock-screen'])
         call(['wget', 'http://bazaar.launchpad.net/~epoptes/epoptes/trunk/download/head:/lock.svg-20110927210214-xi0yyacred1dmjl5-41/lock.svg'])
-
+    if not os.path.isfile("get-display"):
+        pass
 
 #---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
 
@@ -217,6 +253,7 @@ def fetchLibs():
 #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
 #threading.Thread(mainController())
+os.chdir(os.path.dirname(sys.argv[0]))
 fetchLibs()
 m = mainC()
 #m.daemon = True
