@@ -63,34 +63,39 @@ def lineMaker(lines):
 
 
 def submitFile():
-    root = Tkinter.Tk()
-    root.withdraw()
-    file_path = tkFileDialog.askopenfilename()
-    return file_path
+    try:
+        os.chdir(os.path.expanduser("~"))
+        root = Tkinter.Tk()
+        root.withdraw()
+        file_path = tkFileDialog.askopenfilename()
+        return file_path
+    except:
+        print("Error, unable to open file selection window")
+        sleep(3)
+        return(False)
 
 
 def ftpDrop(serverIP):
     os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
     filename = submitFile()
-    file = open("ftper", "w")
+    if not (filename == False):
+        file = open("ftper", "w")
     #print("about to write")
-    file.write("""#!/bin/bash
+        file.write("""#!/bin/bash
 ftp -n -i $1 <<EOF
 user anonymous " "
 binary
 cd handin
 put $2 $3
 EOF""")
-    file.close()
+        file.close()
     #print("about to call")
     #print(filename)
     #print(serverIP)
     #print(os.path.basename(filename))
-    thing = call(["sh", "ftper", serverIP, filename, os.path.basename(filename)])
-    print(thing)
-    print(thing)
+        thing = call(["sh", "ftper", serverIP, filename, os.path.basename(filename)])
     #print("called")
-    call(["rm", "ftper"])
+        call(["rm", "ftper"])
 
 
 
@@ -156,6 +161,7 @@ def transmiter(message, ip, payload = None, port = 50008, raw = False):
     #print("Sending")
     #print((json.dumps((message, payload))))
     if raw:
+        debug(message)
         s.send(json.dumps(message))
     else:
         s.send(json.dumps((message, payload, mainToken)))
@@ -362,8 +368,10 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
                 clientMenu(menuList[requested][1],serverIP)
                 return False
             if menuList[requested][4] == "GetFile":
-                print("submit file")
+                #print("submit file")
                 ftpDrop(serverIP)
+            if menuList[requested][2] == "ExitAll":
+                sys.exit()
 
             #----------------------Custom Functions End---------------
 
@@ -379,7 +387,7 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
                 allC = False
 
             if (menuList[requested][2] == "pi") or (menuList[requested][2] == "server"):
-                tosend = ["", ["", []], mainToken, []]
+                tosend = ["", ["", ["",]], mainToken, []]
                 if (menuList[requested][2] == "pi"):
                     tosend[0] = "Relay"
                     if allC:
@@ -387,17 +395,22 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
                     else:
                         tosend[3] = [piIp, ]
                     tosend[1][0] = menuList[requested][4]
+                    tosend[1][1][0] = secondResponse
+                    #tosend[1][2] = secondResponse
                     pass
                     transmiter(tosend, serverIP, None, 50000, True)
 
                 elif (menuList[requested][2] == "server"):
-                    message = ((secondResponse, piIp))
+                    tosend[0] = "Server"
+                    #tosend[0] = menuList[requested][4]
+                    tosend[1][0] = menuList[requested][4]
+                    tosend[1][1] = secondResponse
                     if allC:
-                        message = ((secondResponse, allClients))
+                        tosend[3] = allClients
                     else:
-                        message = ((secondResponse, piIp))
-                    transmit = False
-                    transmiter(menuList[requested][4], serverIP, message,  50000)
+                        tosend[3] = [piIp, ]
+                    #transmit = False
+                    transmiter(tosend, serverIP, None,  50000, True)
                 else:
                     pass
 

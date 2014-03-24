@@ -10,13 +10,14 @@ import hashlib
 import random
 from logging import debug, info, warning, basicConfig, INFO, DEBUG, WARNING
 
-basicConfig(level=WARNING)
+basicConfig(level=DEBUG)
 
 #Protocols
 """
 Menu drawing - (Reserved, String, IP, Response?, Response_Command, Token?, Secondary_response, Local, Reserved)
 Standard communication - (Message, (Payload), Token)
 Server relay communications - (Relay, (Message, (Payload)), Token, (Recipients)
+Server communications - ("Server", (Message, (Payload)), Token, (Recipients)
 
 Menu
 0. Reserved - A reserved character
@@ -60,6 +61,8 @@ Server Side. To add a function that is run serverside, it must be added in class
 Very similarly to the Pi side, just check if the string coming in is equal to what you expect. e.g. for "FeatureList"
 if (data[0] == "FeatureList"):
     Do something
+
+
 
 """
 
@@ -111,6 +114,8 @@ class clientMenu(threading.Thread):
         self.addToGroup = 2
         self.resetPassword = 2
         self.sendCommand = 2
+        self.blankScreen = 2
+        self.unblackScreen = 2
 
         #--------------------------------
 
@@ -145,6 +150,17 @@ class clientMenu(threading.Thread):
             value = ("", "Assign a name to this Pi", "server", "Please enter a new name", "name", True, "None", False, "" )
             self.menu.append(value)
 
+        if self.sendCommand <= level:
+            value = ("", "Send command this pis", "pi", "Enter command", "BatchCommand", True, "None", False, "" )
+            self.menu.append(value)
+
+        if self.blankScreen <= level:
+            value = ("", "Lock screen", "pi", False, "ScreenLock", True, "None", False, "" )
+            self.menu.append(value)
+
+        if self.shutdown <= level:
+            value = ("", "Unlock screen", "pi", False, "ScreenUnlock", True, "None", False, "" )
+            self.menu.append(value)
 
         if self.exit <= level:
             value = ("", "Exit", "Exit", False, "Exit", True, "None", True, "" )
@@ -220,6 +236,10 @@ class clientMenu(threading.Thread):
             value = ("", "Submit a file", "local", False, "GetFile", True, "None", False, "" )
             self.menu.append(value)
 
+        if self.exit <= level:
+            value = ("", "Quit", "ExitAll", False, "ExitAll", True, "None", True, "" )
+            self.menu.append(value)
+
 
         debug("Menu now built, it is")
         totalMenu = [self.menu, self.ipMenu]
@@ -289,6 +309,7 @@ class console(threading.Thread):
             print("4. Display all users and their permissions")
             print("5. Reset a users password")
             print("6. Disable user token to allow multiple simultaneous logins")
+            print("7. Return to main screen")
             answer = raw_input()
             if answer == "1":
                 self.newUser(sqlU, sqlUc)
@@ -303,6 +324,9 @@ class console(threading.Thread):
                 self.resetPassword(sqlU, sqlUc)
             elif answer == "6":
                 self.setTokenStatus(sqlU,sqlUc)
+            elif answer == "7":
+                notdone = False
+        consoleMessage()
 
 
 
@@ -501,38 +525,44 @@ class transmissionHandler(threading.Thread):
         self.interpreter(ip, data, level, sql)
     def interpreter(self, ip, data, level, sql):
         debug(data)
-        if (data[0] == "name") and (level >1):
-            self.name = (data[1][0])
-            self.ip = (data[1][1])
-            print("IP is " + str(self.ip) + " Name is " + str(self.name))
-            sqld = sql.cursor()
-            debug(self.ip)
-            sqld.execute("""SELECT Serial FROM ClientID WHERE Ip = ? """,(self.ip,) )
-            d = (self.name, sqld.fetchone()[0])
-            sqld.execute("""UPDATE Metadata SET Name = ? WHERE Serial = ?""",d)
-            sql.commit()
-            sql.close()
-        elif (data[0] == "FeatureList"):
-            MenuMake = clientMenu(self.ip, checkToken(data[2]))
-            MenuMake.run()
+        if data[0] == "Server":
+            if (data[1][0] == "name") and (level >1):
+                for i in range(0, len(data[3])):
+                    self.name = (data[1][1])
+                    self.ip = (data[3][i])
+                    print("IP is " + str(self.ip) + " Name is " + str(self.name))
+                    sqld = sql.cursor()
+                    debug(self.ip)
+                    sqld.execute("""SELECT Serial FROM ClientID WHERE Ip = ? """,(self.ip,) )
+                    d = (self.name, sqld.fetchone()[0])
+                    sqld.execute("""UPDATE Metadata SET Name = ? WHERE Serial = ?""",d)
+                sql.commit()
+                sql.close()
+            elif (data[1][0] == "Password"):
+                self.password = data[1][1]
+                #self.ip =
+                debug("new password is " + data[1][1])
+                sqld = sql.cursor()
+                sqld.execute("""SELECT UserID FROM User WHERE Token  = ? """,(data[2],))
+                ID = sqld.fetchone()
+                hashresult = createHash(self.password)
+                sqld.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "Token" = ?""",(str(hashresult[0]), str(hashresult[1]), data[2]))
+                sql.commit()
+                sql.close()
         elif (data[0] == "Relay"):
-            print("Relay data arrived!")
-            print(data)
-            print(data[1][1])
+            debug("Relay data arrived!")
+            debug(data)
             if data[1][1] == []:
-                s = sender(data[3], (data[1][0]))
+                s = sender(data[3], (data[1]))
                 s.run()
-        elif (data[0] == "Password"):
+            else:
+                s = sender(data[3], (data[1]))
+                s.run()
+        elif (data[0] == "FeatureList"):
+                MenuMake = clientMenu(self.ip, checkToken(data[2]))
+                MenuMake.run()
 
-            print("new password is " + data[1][0])
-            sqld = sql.cursor()
-            sqld.execute("""SELECT UserID FROM User WHERE Token  = ? """,(data[2],))
-            ID = sqld.fetchone()
-            hashresult = createHash(data[1][0])
-            sqld.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "Token" = ?""",(str(hashresult[0]), str(hashresult[1]), data[2]))
-            sql.commit()
-            sql.close()
-
+#Server communications - ("Server", (Message, (Payload)), Token, (Recipients)
 
 
 
@@ -565,7 +595,7 @@ def randomDigits(digits):
 
 def createHash(password):
     salt = randomDigits(32)
-    print("The salt is "+ str(salt))
+    debug("The salt is "+ str(salt))
     hashResult = hashlib.sha512(str(salt) + str(password)).hexdigest()
     return (salt, hashResult)
 
@@ -588,7 +618,7 @@ def getToken(credentials, sql, sqlc):
     if not (fetch == None):
         sqlc.execute("""SELECT Hash, Salt FROM User WHERE Username = ? """, username)
         hashSalt = sqlc.fetchone()
-        print(str(fetch[6]))
+        debug(str(fetch[6]))
         if (decodeHash(hashSalt[0], hashSalt[1], credentials[1])) == True:
             if str(fetch[6]) == "1":
                 return username[0]
@@ -632,6 +662,7 @@ def datachecker2(sql, sqlc):
         if data:
             data = json.loads(data)
             if (data[0] == 'Register'):
+                debug(data)
                 ip = (address[0],)
                 sqlc.execute("""SELECT CId, IP, Serial FROM ClientID WHERE IP = ? """, ip)
                 if sqlc.fetchone() == None:
@@ -734,6 +765,14 @@ def InitalSQL(sql):
     createDatabase(sql, sqlc)
     return sqlc
 
+def consoleMessage():
+        print("")
+        print("---------------------")
+        print("Server is running")
+        print("---------------------")
+        print("")
+        print("To access control console press c and then enter")
+        print("------------------------------------------------")
 
 #**********************************************************- Main program - **********************************************************
 
@@ -754,13 +793,7 @@ while mainLoop:
         c = console()
         c.daemon = True
         c.start()
-        print("")
-        print("---------------------")
-        print("Server is now running")
-        print("---------------------")
-        print("")
-        print("To access control console press c and then enter")
-        print("------------------------------------------------")
+        consoleMessage()
 
         b = broadcaster()
         b.daemon = True
