@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-active = True
+active = False
 Server_dead_timeout = 23 #In seconds
 
 import traceback
@@ -16,7 +16,7 @@ import os.path
 import os
 import getpass
 try:
-    import RPi.GPIO as GPIO
+    import RPi.GPIO as GPIO #Tries to import GPIO library
     GpioFound = True
 except ImportError:
     print('Raspberry Pi GPIO library not found')  #Catches errors from running on a non Raspberry Pi
@@ -24,45 +24,45 @@ except ImportError:
 
 class backgroundLock(threading.Thread):
     def __init__(self):
-        super(backgroundLock, self).__init__()
+        super(backgroundLock, self).__init__() #Bring in threading.Thread methods
     def run(self):
-        os.chdir(os.path.dirname(sys.argv[0]))
-        call(["export $(sh get-display) && python lock-screen"], shell=True)
-
-
+        if active:
+            try:
+                os.chdir(os.path.dirname(sys.argv[0]))
+            except:
+                print("Error changing directory")
+            call(["export $(sh get-display) && python lock-screen"], shell=True) #Run the lock screen with active display
 
 
 def getActiveUser():
-    who = Popen(['who'],stdin=PIPE, stdout=PIPE, stderr=STDOUT)
+    who = Popen(['who'],stdin=PIPE, stdout=PIPE, stderr=STDOUT) #Runs who command
     result = who.stdout.read()
-    result = result.split("   ")
-    return result[0]
+    result = result.split("   ") #Splits it up into the multiple users
+    return result[0] #Picks top (most active) user
 
 
 def getserial():
   # Extract serial from cpuinfo file to return
   cpuserial = "0000"
   try:
-    f = open('/proc/cpuinfo','r')
+    f = open('/proc/cpuinfo','r') #Stores info on the cpu
     for line in f:
       if line[0:6]=='Serial':
         cpuserial = line[22:26]
     f.close()
   except:
-    cpuserial = "0000"
+    cpuserial = "0000" #If not a Raspberry Pi or user does not have permission
 
   return cpuserial
 
 
 def transmiter(message, ip, payload = None, expecting = False, port = 50008):
-    #port = 50008
     size = 1024
     s = socket(AF_INET, SOCK_STREAM)
-    #print((ip,port))
     s.connect((ip,port))
-    s.send(json.dumps(message, payload))
+    s.send(json.dumps(message, payload)) #Sends lists (via json)
     sleep(0.2)
-    if expecting:
+    if expecting: #If a response is required (not currently used)
         data = json.loads(s.recv(size))
         return data
     else:
@@ -154,7 +154,7 @@ def flasher():
         GPIO.setwarnings(False)
         GPIO.cleanup()
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(11,GPIO.OUT)
+        GPIO.setup(11,GPIO.OUT) #Flashes GPIO pin 11 on the board, no longer used
         GPIO.output(11,True)
         sleep(1)
         GPIO.output(11,False)
@@ -162,6 +162,7 @@ def flasher():
         print(GpioFound)
 
 def pingreplyer(lastping, Server_dead_timeout):
+    global usersent
     global conn
     HOST = ''  
     PORT = 50008
@@ -170,7 +171,7 @@ def pingreplyer(lastping, Server_dead_timeout):
     s.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1) # Defining the network interface
     bound = False
     while bound == False:
-        try:
+        try: #Tries to bind
             s.bind((HOST,PORT))
             bound = True
         except error:
@@ -184,14 +185,18 @@ def pingreplyer(lastping, Server_dead_timeout):
         
         s.listen(2) #Waits for a connection to be made to the socket, max 2 connections.
         try:
-            conn, addr = s.accept()
-            #print 'Connected by', addr
-            print('Pinged by server at ' + str(addr[0]) + ' at ' + str(datetime.now().strftime('%H:%M:%S')))
+            conn, addr = s.accept() #Creates connection object
+            print('Pinged by server at ' + str(addr[0]) + ' at ' + str(datetime.now().strftime('%H:%M:%S'))) #Prints server address + time
             sleep(0.05)
             data = json.loads(conn.recv(1024))
             if not data: break
             if data[0] == 'Ping':
-                conn.sendall(json.dumps(('Alive',str(getserial()))))
+                user = str(getActiveUser())
+                if not (usersent == user): #Getting username, to be added later
+                    pass
+                else:
+                    pass
+                conn.sendall(json.dumps(('Alive',str(getserial()), user)))
                 lastping = time()
             else:
                 #print(data)
@@ -199,7 +204,7 @@ def pingreplyer(lastping, Server_dead_timeout):
                 #print("interpreter done")
         except timeout:
             print("There has been a timeout...")
-        if (time() - lastping > Server_dead_timeout):
+        if (time() - lastping > Server_dead_timeout): #If there has not been a ping from server in last 23 seconds
             print('')
             print('-------------------------------------------------------------------------')
             print('Server must have died, have not been pinged in over ' + str(Server_dead_timeout) + ' seconds')
@@ -216,14 +221,14 @@ def pingreplyer(lastping, Server_dead_timeout):
     print('Ping 2 conn closed')
     return(lastping)
     
-class mainC(threading.Thread):
+class mainC(threading.Thread): #The main thread, added to allow other threads to be added later
     def __init__(self):
         super(mainC, self).__init__()
     def run(self):
         self.mainController()
     def mainController(self):
         lastping = int(time())
-        while 1:
+        while 1: #Main program loop
             #try:
             serverip = broadcastfinder()
             lastping = register(serverip)
@@ -237,31 +242,36 @@ def broadcastfinder():
     print('Searching for server...')
     s = socket(AF_INET, SOCK_DGRAM)
     s.bind(('', 50011))
-    data, wherefrom = s.recvfrom(1500, 0)
+    data, wherefrom = s.recvfrom(1500, 0) #Searches for a server broadcasting to its network
     #print (data + " " + repr(wherefrom[0]))
     return(wherefrom[0])
 
 def fetchLibs():
-    os.chdir(os.path.dirname(sys.argv[0]))
-    if not os.path.isfile("lock-screen"):
-        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/lock-screen'])
+    try:
+        os.chdir(os.path.dirname(sys.argv[0]))
+    except:
+        print("Error changing directory")
+    if not os.path.isfile("lock-screen"): #Checks to see if required libraries are available
+        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/lock-screen']) #Lock screen library
     if not os.path.isfile("lock.svg"):
-        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/lock.svg'])
+        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/lock.svg']) #Lock symbol for lock screen
     if not os.path.isfile("get-display"):
-        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/get-display'])
+        call(['wget', 'https://raw.github.com/gbaman/Pi_Connector/master/Pi/get-display']) #Script to get active display
 
 #---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
 
 
-#sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-#threading.Thread(mainController())
-os.chdir(os.path.dirname(sys.argv[0]))
+try:
+    os.chdir(os.path.dirname(sys.argv[0]))
+except:
+    print("Error changing directory")
+usersent = None
 fetchLibs()
 m = mainC()
 #m.daemon = True
-#m.start()
-m.run()
+#m.start()  #Can later be used to move main program to a second thread.
+m.run() #Using run is intentional here.
 
 
 """ except: # (not KeyboardInterrupt):
@@ -273,3 +283,4 @@ m.run()
         sleep(1)
         print("RESTARTING")
         sleep(3) """
+#Client auto restarter, disabled by default due to binding issues
