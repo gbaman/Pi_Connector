@@ -10,7 +10,7 @@ import hashlib
 import random
 from logging import debug, info, warning, basicConfig, INFO, DEBUG, WARNING
 
-basicConfig(level=DEBUG)
+basicConfig(level=WARNING)
 
 #Protocols
 """
@@ -69,7 +69,7 @@ if (data[0] == "FeatureList"):
 
 
 
-class clientMenu(threading.Thread):
+class clientMenu(threading.Thread): #Class that controls menu drawing for textclient
 
     def __init__(self, ip, level, menuOpt = "Main", clientList = ""):
         super(clientMenu, self).__init__()
@@ -119,17 +119,18 @@ class clientMenu(threading.Thread):
 
         #--------------------------------
 
-    def run(self):
+    def run(self): #Starts here
         if self.menuOpt == "Main":
-            self.sendMainMenu(self.mainBuild(self.level))
+            self.sendMainMenu(self.mainBuild(self.level)) #If its a main menu request
         elif self.menuOpt == "Home":
-            self.sendHomeMenu(self.homeMenuBuild(self.level))
+            self.sendHomeMenu(self.homeMenuBuild(self.level)) #If its a home meny request
 
 
 
 # Menu drawing - (Reserved, String, IP, Response?, Response_Command, Token?, Secondary_response, Local, Reserved)
     def mainBuild(self, level): # Builds the client menu
         debug("Level is " + str(level))
+
         if self.shutdown <= level:
             value = ("", "Shutdown", "pi", False, "Shutdown", True, "None", False, "" )
             self.menu.append(value)
@@ -174,7 +175,7 @@ class clientMenu(threading.Thread):
         sleep(0.3)
         s = sender((self.ip,), ("MenuDraw", menuList, "1"), 50010, 1)
         s.run()
-
+                                                    #Stars the sender threads
     def sendHomeMenu(self, menuList):
         sleep(0.3)
         s = sender((self.ip,), ("HomeDraw", menuList, "1"), 50009, 1)
@@ -214,9 +215,9 @@ class clientMenu(threading.Thread):
             self.menu.append(value)
 
         for count in range(0, len(self.clientList)):
-            print("self.clientList[count][2] is " + str(self.clientList[count][2]))
-            print(count)
-            print(self.clientList)
+            #print("self.clientList[count][2] is " + str(self.clientList[count][2]))
+            #print(count)
+            #print(self.clientList)
             if self.clientList[count][2] == None:
                 self.clientList[count][2] = ""
 
@@ -247,20 +248,20 @@ class clientMenu(threading.Thread):
         return totalMenu
 
 
-class broadcaster(threading.Thread):
+class broadcaster(threading.Thread): #Class that controls the network broadcasts to allow clients to find the server
     def __init__(self):
         super(broadcaster, self).__init__()
 
     def run(self):
         while True:
-            self.broadcaster()
-            sleep(2)
+            self.broadcaster()  #Broadcast to network
+            sleep(2) #Wait 2 seconds before broadcasting again
 
     def broadcaster(self):
-        s = socket(AF_INET, SOCK_DGRAM)
-        s.bind(('', 0))
+        s = socket(AF_INET, SOCK_DGRAM) #UDP socket
+        s.bind(('', 0)) #Binds to localhost
         s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
-        s.sendto('hello', ('<broadcast>', 50011))
+        s.sendto('hello', ('<broadcast>', 50011)) #Network broadcast
         info('Broadcasting to network my IP')
         s.close()
 class console(threading.Thread):
@@ -294,7 +295,7 @@ class console(threading.Thread):
 
 
 
-    def cMenu(self):
+    def cMenu(self): #Main menu for user management
         sqlU = sqlite3.connect('Pi-control.db')
         sqlUc = sqlU.cursor()
         notdone = True
@@ -346,12 +347,12 @@ class console(threading.Thread):
             else:
                 correct = True
                 usernamex = (username, )
-                sqlUc.execute("""SELECT UserID, Username, Salt, Hash, PermissionLevel, Token FROM User WHERE Username = ? """, usernamex)
+                sqlUc.execute("""SELECT UserID, Username, Salt, Hash, PermissionLevel, Token FROM User WHERE Username = ? """, usernamex) #Checks to see if the user already exists
                 result = sqlUc.fetchone()
-                if result == None:
-                    hashresult = createHash(password1)
+                if result == None: #If it does not already exits
+                    hashresult = createHash(password1) #Creates hash, returns hash and salt
                     debug((username, hashresult[0], hashresult[1], level))
-                    sqlUc.execute("""INSERT INTO User VALUES(NULL,?,?,?,?, NULL, NULL)""", ((username, str(hashresult[0]), str(hashresult[1]), level)))
+                    sqlUc.execute("""INSERT INTO User VALUES(NULL,?,?,?,?, NULL, NULL)""", ((username, str(hashresult[0]), str(hashresult[1]), level))) #Creates new user
                     sqlU.commit()
                     print("User " + str(username) + " has been successfully added")
                     wait()
@@ -362,13 +363,11 @@ class console(threading.Thread):
                     break
 
 
-    def displayUsers(self, sqlU, sqlUc, delay = False):
+    def displayUsers(self, sqlU, sqlUc, delay = False): #Displays all users, has a default delay paramater set to false.
         sqlUc.execute("""SELECT UserID, Username, PermissionLevel FROM User""")
         table = sqlUc.fetchall()
         print("ID : Name - Permission level")
         print("-----------------------")
-        for i in range(0, len(table)):
-            pass
         for count in range(0, len(table)):
             #print(str(table[count]))
             print(str(table[count][0]) + " : " + str(table[count][1]) + " - " + str(self.userperm(table[count][2])))
@@ -463,12 +462,14 @@ class sender(threading.Thread):
         self.data = data
         self.dport = port
         self.timeout = timeout
+
     def run(self):
-        for client in range(0, len(self.sendlist)):
+        for client in range(0, len(self.sendlist)): #For each client in the provided list, try to send the command
             try:
                 self.send(self.sendlist[client], self.data)
             except:
-                warning("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data))
+                warning("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data)) #If a message to client times out
+
     def send(self, client, data):
         debug("sending " + str(client) + " " + str(data))
         s = socket(AF_INET, SOCK_STREAM)
@@ -491,19 +492,19 @@ class ping(threading.Thread):
         sql = sqlite3.connect('Pi-control.db')
         while True:
             self.pinger2(sql)
-            sleep(self.pingFreq)
+            sleep(self.pingFreq) #Wait for 3 seconds before pinging again
 
     def pinger2(self,sql):
         sqlp = sql.cursor()
-        for row in sqlp.execute("""SELECT IP FROM ClientID"""):
+        for row in sqlp.execute("""SELECT IP FROM ClientID"""): #for every client
             s = socket(AF_INET, SOCK_STREAM)
             s.settimeout(0.3)
             try:
-                s.connect((row[0], 50008))
+                s.connect((row[0], 50008))    #Try to connect
                 s.sendall(json.dumps(('Ping',)))
                 self.data = s.recv(1024)
                 s.close()
-            except error:
+            except error: #If it fails, delete them
                 sqlp.execute("""DELETE FROM ClientID WHERE IP = ?""", row)
                 sql.commit()
 
@@ -517,15 +518,17 @@ class transmissionHandler(threading.Thread):
         self.data = data
 
     def run(self):
-        sql = sqlite3.connect('Pi-control.db')
-        self.Handler(self.ip, self.data, sql)
-    def Handler(self, ip, data, sql):
+        sql = sqlite3.connect('Pi-control.db') #Connect to database
+        self.Handler(self.ip, self.data, sql) #Call main handler
+
+    def Handler(self, ip, data, sql): #Main handler, will have more functionality later
         info("Handler called!!")
         level = checkToken(self.data[2])
-        self.interpreter(ip, data, level, sql)
+        self.interpreter(ip, data, level, sql) #Calls main interpreter that is on the second thread
+
     def interpreter(self, ip, data, level, sql):
         debug(data)
-        if data[0] == "Server":
+        if data[0] == "Server": #If the incoming command is aimed at the server
             if (data[1][0] == "name") and (level >1):
                 for i in range(0, len(data[3])):
                     self.name = (data[1][1])
@@ -549,8 +552,8 @@ class transmissionHandler(threading.Thread):
                 sqld.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "Token" = ?""",(str(hashresult[0]), str(hashresult[1]), data[2]))
                 sql.commit()
                 sql.close()
-        elif (data[0] == "Relay"):
-            debug("Relay data arrived!")
+        elif (data[0] == "Relay"): #If the incoming command is due to be relayed on to the client
+            debug("Relay data arrived!") #Relay will later be only way to communicate with pi
             debug(data)
             if data[1][1] == []:
                 s = sender(data[3], (data[1]))
@@ -588,19 +591,19 @@ def listit(t):
 def randomDigits(digits):
     lower = 10**(digits-1)
     upper = 10**digits - 1
-    toreturn = random.randint(lower, upper)
+    toreturn = random.randint(lower, upper) #Generates a random number for the hash
     info("Hash generated is " + str(toreturn))
     return toreturn
 
 
 def createHash(password):
-    salt = randomDigits(32)
+    salt = randomDigits(32) #Generates random number for salt
     debug("The salt is "+ str(salt))
-    hashResult = hashlib.sha512(str(salt) + str(password)).hexdigest()
+    hashResult = hashlib.sha512(str(salt) + str(password)).hexdigest() #Generates sha512 hash
     return (salt, hashResult)
 
 
-def decodeHash(hash, salt, password):
+def decodeHash(hash, salt, password): #Takes hash and salt from database and the provided password, generated a hash from the salt and password and checks if they are equal
     info("At hash, hash is " + str(hash) + " and password is " + str(password))
     hashResult = hashlib.sha512(str(salt) + str(password)).hexdigest()
     info("Hash in database is " + str(hashResult) + " While hash provided is " + str(hash))
@@ -614,20 +617,20 @@ def getToken(credentials, sql, sqlc):
     username = (credentials[0],)
     sqlc.execute("""SELECT UserID, Username, Salt, Hash, PermissionLevel, Token, NoToken FROM User WHERE Username = ? """, username)
     fetch = sqlc.fetchone()
-    debug(str(fetch))
+    debug(str(fetch))   #Checks if user exits
     if not (fetch == None):
         sqlc.execute("""SELECT Hash, Salt FROM User WHERE Username = ? """, username)
         hashSalt = sqlc.fetchone()
         debug(str(fetch[6]))
         if (decodeHash(hashSalt[0], hashSalt[1], credentials[1])) == True:
             if str(fetch[6]) == "1":
-                return username[0]
+                return username[0] # If the user is set up to disable the use of tokens
             else:
-                return randomDigits(10)
+                return randomDigits(10) #If set up to use tokens, username was correct and password was correct
         else:
-            return False
+            return False #Username correct, password not
     else:
-        return False
+        return False #Username unknown
 
 
 def checkToken(token):
@@ -636,22 +639,22 @@ def checkToken(token):
     token = (token, )
     sqld.execute("""SELECT PermissionLevel FROM User WHERE Token = ? """, token)
     result = sqld.fetchone()
-    if not (result == None):
+    if not (result == None): #If result = anything other than none, then that token exits
         debug(str(result))
-        return result[0]
+        return result[0] #Return the username
     else:
         return 0
 
 
 
 
-def getPermission(user):
+def getPermission(user): #Future implementation
     pass
 
-def checkPermission(ID, Required):
+def checkPermission(ID, Required): #Future implementation
     pass
 
-def datachecker2(sql, sqlc):
+def datachecker2(sql, sqlc): #Main overarching main thread communication interpreter
     info('')
     info('Waiting for incoming messages')
     s.settimeout(10) #Time to wait before going onto next function
@@ -660,31 +663,31 @@ def datachecker2(sql, sqlc):
         sleep(0.1)
         data = client.recv(size)
         if data:
-            data = json.loads(data)
-            if (data[0] == 'Register'):
+            data = json.loads(data) #Convert data from a json object to a list
+            if (data[0] == 'Register'): #If data is register, the command for setting up a new pi
                 debug(data)
                 ip = (address[0],)
-                sqlc.execute("""SELECT CId, IP, Serial FROM ClientID WHERE IP = ? """, ip)
+                sqlc.execute("""SELECT CId, IP, Serial FROM ClientID WHERE IP = ? """, ip) #Checks if pi is already in the database (avoids duplicates)
                 if sqlc.fetchone() == None:
                     serial = str(data[1])
                     dat = (address[0], serial)
-                    sqlc.execute("""INSERT INTO ClientID VALUES(NULL,?, ?)""", dat)
+                    sqlc.execute("""INSERT INTO ClientID VALUES(NULL,?, ?)""", dat) #Adds client
                     sqlc.execute("""SELECT Serial FROM Metadata WHERE Serial = ? """, (serial,))
                     if sqlc.fetchone() == None:
-                        sqlc.execute("""INSERT INTO Metadata VALUES(?,NULL) """, (serial,))
+                        sqlc.execute("""INSERT INTO Metadata VALUES(?,NULL) """, (serial,)) #If we have never met pi before, save its serial number
                     sql.commit()
                     info('')
                     info('-------------------------------------')
                     info('Client at ' + str(address[0]) +' added to list')
                     info('-------------------------------------')
                     info('')
-                client.send(json.dumps(('Accept',)))
+                client.send(json.dumps(('Accept',))) #Alert the pi that it has been added
                 sleep(0.05)
 
-            elif data[0] == "Token":
+            elif data[0] == "Token": #Request for token from the client
                 credentials = data[1]
                 ip = (address[0],)
-                result = getToken(credentials, sql, sqlc)
+                result = getToken(credentials, sql, sqlc) #Create token
                 if not (result == False):
                     d = (result, credentials[0])
                     debug(str(d))
@@ -695,23 +698,23 @@ def datachecker2(sql, sqlc):
                     result = 0
                 client.send(json.dumps((result,)))
 
-            else:
+            else: #If not either of the above, check if requestlist
                 debug(data)
                 debug("Data it cant get is" + str(data[2]))
-                if (checkToken(data[2]) > 0):
+                if (checkToken(data[2]) > 0): #Checks level
                     if data[0] == 'RequestList':
                         sqlc.execute("""SELECT ClientID.IP, ClientID.Serial, Metadata.Name
                                     FROM ClientID
                                     INNER JOIN Metadata
-                                    ON ClientID.Serial = Metadata.Serial""")
+                                    ON ClientID.Serial = Metadata.Serial""") #Pulls data from 2 tables to build the list of clients
                         tosendlist = sqlc.fetchall()
-                        cm = clientMenu(address[0], checkToken(data[2]), "Home", tosendlist)
+                        cm = clientMenu(address[0], checkToken(data[2]), "Home", tosendlist) #Passes this information to a new thread to build menu
                         cm.run()
 
 
                         #client.send(json.dumps((tosendlist,)))
                     else:
-                        t = transmissionHandler(address[0], data)
+                        t = transmissionHandler(address[0], data) #If none of the above, switch to a new thread to allow main thread to continue
                         t.daemon = True
                         t.start()
 
@@ -720,8 +723,6 @@ def datachecker2(sql, sqlc):
                     warning("Invalid login")
     except timeout:
         pass
-    #except:
-        #pass
 
 
 def createDatabase(sqlc, sql):
@@ -734,12 +735,12 @@ Serial varchar(4) NOT NULL
 )''')
     sqlc.execute("""CREATE  TABLE IF NOT EXISTS "main"."Connection" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "IP" VARCHAR NOT NULL , "Key" INTEGER)""")
     sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Metadata" ("Serial" VARCHAR PRIMARY KEY  NOT NULL  UNIQUE , "Name" VARCHAR)""")
-    sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Group" ("GroupID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Name" VARCHAR NOT NULL , "Description" VARCHAR)""")
-    sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."GroupConnection" ("ID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Serial" VARCHAR NOT NULL , "GroupID" INTEGER NOT NULL )""")
+    #sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Group" ("GroupID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Name" VARCHAR NOT NULL , "Description" VARCHAR)""")                 #To be added later
+    #sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."GroupConnection" ("ID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Serial" VARCHAR NOT NULL , "GroupID" INTEGER NOT NULL )""")    #To be added later
     sqlc.execute("""CREATE TABLE IF NOT EXISTS "User" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Username" VARCHAR NOT NULL , "Salt" VARCHAR NOT NULL , "Hash" VARCHAR NOT NULL , "PermissionLevel" INTEGER NOT NULL, "Token" VARCHAR , "NoToken" BOOL DEFAULT FALSE)""")
     #sql.commit()
 
-def setupNetworking():
+def setupNetworking(): #Create an inital network object, s
     host = ''
     port = 50000
     backlog = 5
@@ -782,38 +783,35 @@ while mainLoop:
     try:
 
         size = 1024
-        s = setupNetworking()
+        s = setupNetworking() #Create network object
         clientlist = []
-        sql = sqlite3.connect('Pi-control.db')
-        sqlc = InitalSQL(sql)
+        sql = sqlite3.connect('Pi-control.db') #Connect to database
+        sqlc = InitalSQL(sql) #Create SQL curser
 
         p = ping()
         p.daemon = True
         p.start() #Starts the pinger thread
+
         c = console()
         c.daemon = True
-        c.start()
+        c.start() #Starts the console thread
+
         consoleMessage()
 
         b = broadcaster()
         b.daemon = True
-        b.start()
+        b.start() #Starts the broadcasting thread
 
         while 1:
-            #broadcaster()
-            #pinger(clientlist)
-            #p.pinger2(sql,sqlc)
-            #clientlist = datachecker(clientlist)
             datachecker2(sql,sqlc)
+
+
+
     except:
         print('************************************')
         print("System error...")
         traceback.print_exc(file=sys.stdout) #Prints out traceback error
         print('************************************')
         print("")
-        mainLoop = False
-        #print("Hit any key to proceed")
-        #raw_input()
-        #print("RESTARTING")
-        #sleep(3)
+        break
 

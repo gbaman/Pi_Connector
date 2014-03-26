@@ -64,10 +64,10 @@ def lineMaker(lines):
 
 def submitFile():
     try:
-        os.chdir(os.path.expanduser("~"))
+        os.chdir(os.path.expanduser("~")) #Changes to home directory
         root = Tkinter.Tk()
         root.withdraw()
-        file_path = tkFileDialog.askopenfilename()
+        file_path = tkFileDialog.askopenfilename() #Creates a TK file selection window
         return file_path
     except:
         print("Error, unable to open file selection window")
@@ -79,7 +79,7 @@ def ftpDrop(serverIP):
     os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
     filename = submitFile()
     if not (filename == False):
-        file = open("ftper", "w")
+        file = open("ftper", "w") #Create a bash script file to upload to server
     #print("about to write")
         file.write("""#!/bin/bash
 ftp -n -i $1 <<EOF
@@ -89,11 +89,7 @@ cd handin
 put $2 $3
 EOF""")
         file.close()
-    #print("about to call")
-    #print(filename)
-    #print(serverIP)
-    #print(os.path.basename(filename))
-        thing = call(["sh", "ftper", serverIP, filename, os.path.basename(filename)])
+        thing = call(["sh", "ftper", serverIP, filename, os.path.basename(filename)]) #Runs bash script
     #print("called")
         call(["rm", "ftper"])
 
@@ -119,7 +115,7 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(10)
             s.connect((host,port))
-            s.send(json.dumps((message, "", mainToken)))
+            s.send(json.dumps((message, "", mainToken))) #Sends request plus token
             waiting = True
             s.close()
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -130,13 +126,11 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
             while waiting == True:
                 data = conn.recv(1024)
                 if data:
-                    #print('data is ' + str(data))
                     data = json.loads(data)
                     conn.close()
                     s.close()
                     gotdata = True
                     waiting = False
-                    #print(data)
 
                     return data[0]
                 else:
@@ -145,7 +139,7 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
         except socket.error:
             warning('Can not find server, trying again')
             sleep(2)
-            traceback.print_exc(file=sys.stdout)
+            traceback.print_exc(file=sys.stdout) #If server is unavilable give a traceback
 
 def transmiter(message, ip, payload = None, port = 50008, raw = False):
     global mainToken
@@ -162,9 +156,9 @@ def transmiter(message, ip, payload = None, port = 50008, raw = False):
     #print((json.dumps((message, payload))))
     if raw:
         debug(message)
-        s.send(json.dumps(message))
+        s.send(json.dumps(message)) #If it is raw ready to go list
     else:
-        s.send(json.dumps((message, payload, mainToken)))
+        s.send(json.dumps((message, payload, mainToken))) #If normal message format
     sleep(0.05)
     s.close()
 
@@ -215,7 +209,7 @@ def transmiterListen(port):
 
 
 
-def grouper(ip):
+def grouper(ip): #Not currently implemented
     MenuRun = True
     while MenuRun == True:
         print('What would you like to do?')
@@ -223,16 +217,16 @@ def grouper(ip):
         break
 
 
-class LoginC():
+class LoginC(): #The main login system for managing logins and tokens
     def __init__(self, serverIP):
         self.serverIP = serverIP
         self.token = ""
 
     def getToken(self):
         success = False
-        while success == False:
+        while success == False: #Keep repeating till they get successful credentials
             credentials =  self.details()
-            self.token = transmiterReturn("Token", self.serverIP, credentials, 50000)
+            self.token = transmiterReturn("Token", self.serverIP, credentials, 50000) #Checks credentials
             if ((str(self.token)) == "0"):
                 print("\n"*10)
                 print("---------------------")
@@ -242,7 +236,7 @@ class LoginC():
             else:
                 success = True
         debug("Token is " + str(self.token))
-        global mainToken
+        global mainToken #Sets the main communication token
         mainToken = self.token
 
 
@@ -251,7 +245,7 @@ class LoginC():
         print("Please enter your username")
         username = (raw_input()).lower()
         print("Please enter password")
-        password = getpass.getpass()
+        password = getpass.getpass() #Uses getpass to hide password
         debug(password)
         return ((username, password))
 
@@ -259,7 +253,7 @@ class LoginC():
 
 
 
-def ipmenu(ip, serverIP):
+def ipmenu(ip, serverIP): #NO LONGER USED - Kept for old reference
     clearer()
     menurun = True
     while menurun == True:
@@ -329,29 +323,29 @@ def clientMenu(ip, serverIP, MenuName = "FeatureList"):
     debug(login.token)
     #print("IP is "+str(ip))
     piIp = ip
-    transmiter(MenuName, serverIP, None, 50000)
-    menuList = (transmiterListen(50010))
+    transmiter(MenuName, serverIP, None, 50000) #Request a client menu
+    menuList = (transmiterListen(50010)) #The menu object
     #print("Menulist is "+ str(menuList))
     menurun = True
-    if menuList == []:
+    if menuList == []: #If they have no permissions for that client, should never occure
         print("You have no permissions for this client")
         sleep(3)
     while menurun == True:
         print('What would you like to do with this Raspberry Pi?')
         print('Currently connected to ' + str(piIp))
         print('')
-        for count in range(1, len(menuList)+1):
+        for count in range(1, len(menuList)+1): #Goes through the list displaying the menu
             print(str(count) + ". " + str(menuList[count-1][1]))
         answer = raw_input()
         try:
-            answer = int(answer)
+            answer = int(answer) #Checks if the entered value can be converted to an integer
         except:
             print("Invalid value supplied")
             sleep(2)
             continue
 
 
-        menurun = menuInterpreter(menuList, answer, piIp, serverIP)
+        menurun = menuInterpreter(menuList, answer, piIp, serverIP) #Runs the main menu interpreter
         #Interpreter
 def menuInterpreter(menuList, answer, piIp, serverIP):
         global allClients
@@ -360,7 +354,7 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
 
             #----------------------Custom Functions-------------------
 
-            if menuList[requested][2] == "Exit":
+            if menuList[requested][2] == "Exit": #Returns to previous menu
                 return False
             if menuList[requested][2] == "Refresh":
                 return False
@@ -369,59 +363,58 @@ def menuInterpreter(menuList, answer, piIp, serverIP):
                 return False
             if menuList[requested][4] == "GetFile":
                 #print("submit file")
-                ftpDrop(serverIP)
+                ftpDrop(serverIP) #FTP system
             if menuList[requested][2] == "ExitAll":
-                sys.exit()
+                sys.exit() #Quits python program
 
             #----------------------Custom Functions End---------------
 
             if (not (menuList[requested][3] == False)):
                 print(menuList[requested][3])
-                secondResponse = raw_input()
+                secondResponse = raw_input() #If the option requires additional information
             else:
-                secondResponse = ""
-            if (menuList[requested][2][0] == "all"):
+                secondResponse = "" #If it does not, leave field blank
+            if (menuList[requested][2][0] == "all"): #Should I send it to all clients?
                 allC = True
-                menuList[requested][2] = menuList[requested][2][1]
+                menuList[requested][2] = menuList[requested][2][1] #Reverts it back to normal pi mode for legacy interpreter
             else:
                 allC = False
 
-            if (menuList[requested][2] == "pi") or (menuList[requested][2] == "server"):
-                tosend = ["", ["", ["",]], mainToken, []]
-                if (menuList[requested][2] == "pi"):
-                    tosend[0] = "Relay"
+            if (menuList[requested][2] == "pi") or (menuList[requested][2] == "server"): #Checks that it isnt a direct IP address or other
+                tosend = ["", ["", ["",]], mainToken, []] #Builds unfilled in response
+                #tosend key --- [server or relay, [command, [payload,]], token, [clients],]
+                if (menuList[requested][2] == "pi"): #If is meant to be sent to a Raspberry Pi
+                    tosend[0] = "Relay" #Sets it as relay as all communications should relay via the server to the client, no direct communications!
                     if allC:
-                        tosend[3] = allClients
+                        tosend[3] = allClients #If it is to be sent to all clients, put all clients into the list
                     else:
-                        tosend[3] = [piIp, ]
-                    tosend[1][0] = menuList[requested][4]
-                    tosend[1][1][0] = secondResponse
-                    #tosend[1][2] = secondResponse
-                    pass
-                    transmiter(tosend, serverIP, None, 50000, True)
+                        tosend[3] = [piIp, ] #If not, just send to a single IP address
+                    tosend[1][0] = menuList[requested][4] #Because being relayed, tosend[0] will = relay, tosend[1][0] is the command for the actual client
+                    tosend[1][1][0] = secondResponse #Add the second response to the payload
+                    transmiter(tosend, serverIP, None, 50000, True) #Send it!
 
-                elif (menuList[requested][2] == "server"):
-                    tosend[0] = "Server"
-                    #tosend[0] = menuList[requested][4]
-                    tosend[1][0] = menuList[requested][4]
-                    tosend[1][1] = secondResponse
+                elif (menuList[requested][2] == "server"): #If it is meant to be only sent to server (change password for example)
+                    tosend[0] = "Server" #Destination
+                    tosend[1][0] = menuList[requested][4] #Command
+                    tosend[1][1] = secondResponse #Adds second reponse to the payload
                     if allC:
-                        tosend[3] = allClients
+                        tosend[3] = allClients #If it is to be sent to all clients, put all clients into the list
                     else:
-                        tosend[3] = [piIp, ]
-                    #transmit = False
-                    transmiter(tosend, serverIP, None,  50000, True)
+                        tosend[3] = [piIp, ] #If not, just send to a single IP address
+                    transmiter(tosend, serverIP, None,  50000, True) #Send it!
                 else:
                     pass
-
-
                 return False
+        else:
+            print("Invalid option")
+            sleep(2)
+
 
 
 def menu(clientlist, ipaddress):
     global allClients
     while True:
-        clientlist = grablist(ipaddress)
+        clientlist = grablist(ipaddress) #Gets the list of clients via legacy method, TO UPGRADE LATER
         clearer()
         lineMaker(3)
         print('Raspberry Pi Classroom Management Text Client')
@@ -429,12 +422,8 @@ def menu(clientlist, ipaddress):
         print('')
         clientlist = clientlist[1]
         clientIPs = clientlist[1]
-
-
-        menuOption = clientlist[0]
-
-
-        for clientnum in range(0, len(menuOption)):
+        menuOption = clientlist[0] #Split the menu
+        for clientnum in range(0, len(menuOption)): #Iterations through prebuilt menu
             print(str(clientnum + 1) + ". " + menuOption[clientnum][1])
         print("")
         print('Connected Raspberry Pis')
@@ -442,7 +431,7 @@ def menu(clientlist, ipaddress):
 
 
         for clientnum in range(0, len(clientIPs)):
-            print(str(clientnum + len(menuOption) + 1) + ". " + clientIPs[clientnum][1][0] + " - " + clientIPs[clientnum][1][1])
+            print(str(clientnum + len(menuOption) + 1) + ". " + clientIPs[clientnum][1][0] + " - " + clientIPs[clientnum][1][1]) #Print the pis
             clientIPs[clientnum][1] = clientIPs[clientnum][1][0]
         allClients = []
         for i in range(0, len(clientIPs)):
@@ -450,20 +439,19 @@ def menu(clientlist, ipaddress):
 
         answer = raw_input()
 
-        fullMenu = menuOption + clientIPs
+        fullMenu = menuOption + clientIPs #The full length
         try:
-            answer = int(answer)
+            answer = int(answer) #Tries to convert to integer
         except:
-            continue
+            continue #If isnt integer, loop again
         menuInterpreter(fullMenu, answer, 0, ipaddress)
 
 
-
+#----------------------------------------------------------------Main program-----------------------------------------------------------------
 
 startupimage2()
 ipaddress = broadcastfinder()
 login = LoginC(ipaddress)
 login.getToken()
-#print('Attempting to connect to server')
 clientlist = grablist(ipaddress)
 menu(clientlist, ipaddress)
