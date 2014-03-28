@@ -270,10 +270,20 @@ class console(threading.Thread):
         super(console, self).__init__()
     def run(self):
         while True:
-            response = raw_input()
+            consoleMessage()
+            try:
+                response = raw_input()
+                response = response.lower()
+            except:
+                print("Invalid input")
+                sleep(1.5)
+                continue
             if response == "c":
                 response = ""
                 self.cMenu()
+            else:
+                print("Invalid input")
+                sleep(1.5)
 
     def sort(self, array):
         less = []
@@ -327,6 +337,9 @@ class console(threading.Thread):
                 self.setTokenStatus(sqlU,sqlUc)
             elif answer == "7":
                 notdone = False
+            else:
+                print("That is not a valid option")
+                wait()
         consoleMessage()
 
 
@@ -399,6 +412,12 @@ class console(threading.Thread):
                 sqlU.commit()
                 print("User successfully deleted")
                 wait()
+            else:
+                print("Operation canceled")
+                wait()
+        else:
+            print("User does not exist")
+            wait()
 
 
     def resetPassword(self, sqlU, sqlUc):
@@ -407,12 +426,19 @@ class console(threading.Thread):
         cID = raw_input()
         if self.checkIfUserExists(sqlU, sqlUc, cID):
             print("Please enter a password to set it to")
-            print("To exit, type 0")
+            print("To cancel, leave blank")
             password = raw_input()
-            hashresult = createHash(password)
-            sqlUc.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "UserID" = ?""",(str(hashresult[0]), str(hashresult[1]), int(cID)))
-            sqlU.commit()
-            print("Password successfully changed")
+            if not (password == ""):
+                hashresult = createHash(password)
+                sqlUc.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "UserID" = ?""",(str(hashresult[0]), str(hashresult[1]), int(cID)))
+                sqlU.commit()
+                print("Password successfully changed")
+                wait()
+            else:
+                print("Operation canceled")
+                wait()
+        else:
+            print("User not found")
             wait()
 
     def setTokenStatus(self, sqlU, sqlUc):
@@ -423,6 +449,9 @@ class console(threading.Thread):
             sqlUc.execute("""UPDATE "main"."User" SET "NoToken" = ? WHERE  "UserID" = ?""",(True, int(cID)))
             sqlU.commit()
             print("User updated")
+            wait()
+        else:
+            print("User not found")
             wait()
 
     def userperm(self, value):
@@ -447,8 +476,14 @@ class console(threading.Thread):
             level = raw_input()
             if (level == "1") or (level == "2") or (level == "3"):
                 sqlUc.execute("""UPDATE "main"."User" SET "PermissionLevel" = ? WHERE  "UserID" = ?""",(int(level), int(cID), ))
+                sqlU.commit()
+                print("Operation was successful")
             else:
                 print("Error, value must be between 1 and 3")
+                wait()
+        else:
+            print("Unknown user ID...")
+            wait()
 
 #-------------------------------------------END OF CONSOLE CLASS-------------------------------------------
 #-------------------------------------------END OF CONSOLE CLASS-------------------------------------------
@@ -767,6 +802,7 @@ def InitalSQL(sql):
     return sqlc
 
 def consoleMessage():
+        print("\n" * 5)
         print("")
         print("---------------------")
         print("Server is running")
@@ -796,7 +832,7 @@ while mainLoop:
         c.daemon = True
         c.start() #Starts the console thread
 
-        consoleMessage()
+        #consoleMessage()
 
         b = broadcaster()
         b.daemon = True
