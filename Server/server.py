@@ -352,11 +352,15 @@ class console(threading.Thread):
             password1 = raw_input("Enter password : ")
             password2 = raw_input("Enter password : ")
             level = raw_input("Enter permission level (1-3) : ")
+            if len(password1) < 3:
+                print("Password must be at least 3 characters long!")
+                wait()
+                continue
             if not (password1 == password2):
                 correct = False
                 print("Passwords must match, try again")
                 wait()
-                break
+                continue
             else:
                 correct = True
                 usernamex = (username, )
@@ -396,7 +400,9 @@ class console(threading.Thread):
         if result == None:
             return False
         else:
+            print("---------------------------------")
             print(result[1])
+            print("---------------------------------")
             return True
 
 
@@ -429,11 +435,16 @@ class console(threading.Thread):
             print("To cancel, leave blank")
             password = raw_input()
             if not (password == ""):
-                hashresult = createHash(password)
-                sqlUc.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "UserID" = ?""",(str(hashresult[0]), str(hashresult[1]), int(cID)))
-                sqlU.commit()
-                print("Password successfully changed")
-                wait()
+                if len(password) < 3:
+                    print("Error, password must be at least 3 characters!")
+                    wait()
+
+                else:
+                    hashresult = createHash(password)
+                    sqlUc.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "UserID" = ?""",(str(hashresult[0]), str(hashresult[1]), int(cID)))
+                    sqlU.commit()
+                    print("Password successfully changed")
+                    wait()
             else:
                 print("Operation canceled")
                 wait()
@@ -503,7 +514,8 @@ class sender(threading.Thread):
             try:
                 self.send(self.sendlist[client], self.data)
             except:
-                warning("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data)) #If a message to client times out
+
+                info("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data)) #If a message to client times out
 
     def send(self, client, data):
         debug("sending " + str(client) + " " + str(data))
