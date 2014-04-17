@@ -139,7 +139,7 @@ def grablist(ipaddress): #Job is to grab the list off the server of connected cl
         except socket.error:
             warning('Can not find server, trying again')
             sleep(2)
-            traceback.print_exc(file=sys.stdout) #If server is unavilable give a traceback
+            debug(traceback.print_exc(file=sys.stdout)) #If server is unavilable give a traceback
 
 def transmiter(message, ip, payload = None, port = 50008, raw = False):
     global mainToken

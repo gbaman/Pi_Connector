@@ -270,10 +270,20 @@ class console(threading.Thread):
         super(console, self).__init__()
     def run(self):
         while True:
-            response = raw_input()
+            consoleMessage()
+            try:
+                response = raw_input()
+                response = response.lower()
+            except:
+                print("Invalid input")
+                sleep(1.5)
+                continue
             if response == "c":
                 response = ""
                 self.cMenu()
+            else:
+                print("Invalid input")
+                sleep(1.5)
 
     def sort(self, array):
         less = []
@@ -327,6 +337,9 @@ class console(threading.Thread):
                 self.setTokenStatus(sqlU,sqlUc)
             elif answer == "7":
                 notdone = False
+            else:
+                print("That is not a valid option")
+                wait()
         consoleMessage()
 
 
@@ -339,11 +352,15 @@ class console(threading.Thread):
             password1 = raw_input("Enter password : ")
             password2 = raw_input("Enter password : ")
             level = raw_input("Enter permission level (1-3) : ")
+            if len(password1) < 3:
+                print("Password must be at least 3 characters long!")
+                wait()
+                continue
             if not (password1 == password2):
                 correct = False
                 print("Passwords must match, try again")
                 wait()
-                break
+                continue
             else:
                 correct = True
                 usernamex = (username, )
@@ -383,7 +400,9 @@ class console(threading.Thread):
         if result == None:
             return False
         else:
+            print("---------------------------------")
             print(result[1])
+            print("---------------------------------")
             return True
 
 
@@ -399,6 +418,12 @@ class console(threading.Thread):
                 sqlU.commit()
                 print("User successfully deleted")
                 wait()
+            else:
+                print("Operation canceled")
+                wait()
+        else:
+            print("User does not exist")
+            wait()
 
 
     def resetPassword(self, sqlU, sqlUc):
@@ -407,12 +432,24 @@ class console(threading.Thread):
         cID = raw_input()
         if self.checkIfUserExists(sqlU, sqlUc, cID):
             print("Please enter a password to set it to")
-            print("To exit, type 0")
+            print("To cancel, leave blank")
             password = raw_input()
-            hashresult = createHash(password)
-            sqlUc.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "UserID" = ?""",(str(hashresult[0]), str(hashresult[1]), int(cID)))
-            sqlU.commit()
-            print("Password successfully changed")
+            if not (password == ""):
+                if len(password) < 3:
+                    print("Error, password must be at least 3 characters!")
+                    wait()
+
+                else:
+                    hashresult = createHash(password)
+                    sqlUc.execute("""UPDATE "main"."User" SET "Salt" = ?, "Hash" = ? WHERE  "UserID" = ?""",(str(hashresult[0]), str(hashresult[1]), int(cID)))
+                    sqlU.commit()
+                    print("Password successfully changed")
+                    wait()
+            else:
+                print("Operation canceled")
+                wait()
+        else:
+            print("User not found")
             wait()
 
     def setTokenStatus(self, sqlU, sqlUc):
@@ -423,6 +460,9 @@ class console(threading.Thread):
             sqlUc.execute("""UPDATE "main"."User" SET "NoToken" = ? WHERE  "UserID" = ?""",(True, int(cID)))
             sqlU.commit()
             print("User updated")
+            wait()
+        else:
+            print("User not found")
             wait()
 
     def userperm(self, value):
@@ -447,8 +487,14 @@ class console(threading.Thread):
             level = raw_input()
             if (level == "1") or (level == "2") or (level == "3"):
                 sqlUc.execute("""UPDATE "main"."User" SET "PermissionLevel" = ? WHERE  "UserID" = ?""",(int(level), int(cID), ))
+                sqlU.commit()
+                print("Operation was successful")
             else:
                 print("Error, value must be between 1 and 3")
+                wait()
+        else:
+            print("Unknown user ID...")
+            wait()
 
 #-------------------------------------------END OF CONSOLE CLASS-------------------------------------------
 #-------------------------------------------END OF CONSOLE CLASS-------------------------------------------
@@ -468,7 +514,8 @@ class sender(threading.Thread):
             try:
                 self.send(self.sendlist[client], self.data)
             except:
-                warning("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data)) #If a message to client times out
+
+                info("Command to "+ str(self.sendlist[client])+ " failed, commmand was " + str(self.data)) #If a message to client times out
 
     def send(self, client, data):
         debug("sending " + str(client) + " " + str(data))
@@ -728,11 +775,11 @@ def datachecker2(sql, sqlc): #Main overarching main thread communication interpr
 def createDatabase(sqlc, sql):
     info("Creating database")
     sqlc.execute('''CREATE TABLE ClientID
-(
-CId INTEGER PRIMARY KEY AUTOINCREMENT,
-IP varchar(15) NOT NULL,
-Serial varchar(4) NOT NULL
-)''')
+    (
+    CId INTEGER PRIMARY KEY AUTOINCREMENT,
+    IP varchar(15) NOT NULL,
+    Serial varchar(4) NOT NULL
+    )''')
     sqlc.execute("""CREATE  TABLE IF NOT EXISTS "main"."Connection" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "IP" VARCHAR NOT NULL , "Key" INTEGER)""")
     sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Metadata" ("Serial" VARCHAR PRIMARY KEY  NOT NULL  UNIQUE , "Name" VARCHAR)""")
     #sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Group" ("GroupID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Name" VARCHAR NOT NULL , "Description" VARCHAR)""")                 #To be added later
@@ -767,6 +814,7 @@ def InitalSQL(sql):
     return sqlc
 
 def consoleMessage():
+        print("\n" * 5)
         print("")
         print("---------------------")
         print("Server is running")
@@ -796,7 +844,7 @@ while mainLoop:
         c.daemon = True
         c.start() #Starts the console thread
 
-        consoleMessage()
+        #consoleMessage()
 
         b = broadcaster()
         b.daemon = True
