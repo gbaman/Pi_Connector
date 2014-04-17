@@ -775,11 +775,11 @@ def datachecker2(sql, sqlc): #Main overarching main thread communication interpr
 def createDatabase(sqlc, sql):
     info("Creating database")
     sqlc.execute('''CREATE TABLE ClientID
-(
-CId INTEGER PRIMARY KEY AUTOINCREMENT,
-IP varchar(15) NOT NULL,
-Serial varchar(4) NOT NULL
-)''')
+    (
+    CId INTEGER PRIMARY KEY AUTOINCREMENT,
+    IP varchar(15) NOT NULL,
+    Serial varchar(4) NOT NULL
+    )''')
     sqlc.execute("""CREATE  TABLE IF NOT EXISTS "main"."Connection" ("UserID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "IP" VARCHAR NOT NULL , "Key" INTEGER)""")
     sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Metadata" ("Serial" VARCHAR PRIMARY KEY  NOT NULL  UNIQUE , "Name" VARCHAR)""")
     #sqlc.execute("""CREATE  TABLE  IF NOT EXISTS "main"."Group" ("GroupID" INTEGER PRIMARY KEY  AUTOINCREMENT  NOT NULL  UNIQUE , "Name" VARCHAR NOT NULL , "Description" VARCHAR)""")                 #To be added later
