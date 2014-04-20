@@ -1,41 +1,39 @@
 Pi_Connector
 ============
 
-Connector software for a collection of headless Raspberry Pis
-The software does not require any IP addresses and will automatically find each other.
-
-
+Pi_connector is a backend system for controlling Raspberry Pis (and possibly other Linux based operating systems). It features a simple commandline based frontend for managing the system, user accounts and a permission based menu system. It's main use though is running BASH commands on a single or multiple Raspberry Pis. Want to add a new command? Check the large comment at the top of ```server.py```.   
+   
+There is 3 main sections to the program.   
+A server, a client and the software that runs on all your Raspberry Pis.   
+All the code has only been tested on Unix based OSs (Linux, Mac OS etc), may not work reliably under windows.  
+   
+Installation
+=============
+   
+```git clone https://github.com/gbaman/Pi_Connector```    
+```cd Pi_Connector```   
+   
+The server   
+```python setup.py standalone server```
+   
+The textclient   
+```python setup.py standalone client```   
+   
+The daemon (to run on pis)   
+```python setup.py standalone picontrol```   
+   
+Everything on the one machine   
+```python setup.py standalone full```   
+   
+To uninstall everything   
+```python setup.py standalone remove```  
+   
+   
 How to use
 ============
+   
+To launch the server, open a terminal and type ```raspiServer```   
+To launch the textclient, open a terminal and type ```raspiClient```   
+The daemon should automatically launch, to restart it, use   
+```service picontrol.sh stop``` and ```service picontrol.sh start```
 
-Clone the repository.
-There is 3 main sections to the program.
-A server, a client and the software that runs on all your Raspberry Pis.
-
-All the code has only been tested on Unix based OSs (Linux, Mac OS etc), may not work reliably under windows.
-
-
-Copy the picontrol.py over to the pi to /usr/local/bin/picontrol.py
-Then copy picontrol.sh to /etc/init.d/picontrol.sh
-Make it executable sudo chmod 755 /etc/init.d/picontrol.sh 
-Finally, update your OS for your script to run on boot sudo update-rc.d picontrol.sh defaults
-
-Next reboot your pi and run the server on a separate machine. The picontrol.py script cannot be run on the same computer as the server. The client though can run on the same machine as the server and in this current release is required to be.
-
-Once the Pi reboots, as long as the server is running on the network, the pi should register with the server, refresh the text client and it should be in the list.
-Not all functions work currently, reboot and shutdown work fine while scratch GPIO is a bit buggy. Name, LEDs and Alive check do not currently work in this release.
-
-Current Bugs
-============
-- Assign name, Flash LEDs and Alive check currently do not work.
-- Scratch GPIO has no check if you currently have it installed
-- Scratch GPIO crashes client
-- A large amount of debug info still exists.
-- Code isn't commented yet much
-
-Changelog
-============
-0.1 - Initial release - 26.7.2013 - Danger, very buggy
-0.2 - 29.7.2013 - Still very buggy, fixed auto reconnect and added splash screen
-0.2.1 - 30.7.2013 - Still very buggy, rewrote pinger and fixed auto reconnect again...
-0.3 - 30.8.2013 - Still buggy, fixed large amount of bugs, reoptimised large amounts of code
