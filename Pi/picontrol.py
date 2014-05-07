@@ -260,27 +260,27 @@ def fetchLibs():
 
 #---------------------------------------------------------------------------------Main Program----------------------------------------------------------------------------------
 
+if __name__ == '__main__':
+
+    try:
+        os.chdir(os.path.dirname(sys.argv[0]))
+    except:
+        print("Error changing directory")
+    usersent = None
+    fetchLibs()
+    m = mainC()
+    #m.daemon = True
+    #m.start()  #Can later be used to move main program to a second thread.
+    m.run() #Using run is intentional here.
 
 
-try:
-    os.chdir(os.path.dirname(sys.argv[0]))
-except:
-    print("Error changing directory")
-usersent = None
-fetchLibs()
-m = mainC()
-#m.daemon = True
-#m.start()  #Can later be used to move main program to a second thread.
-m.run() #Using run is intentional here.
-
-
-""" except: # (not KeyboardInterrupt):
-        print('************************************')
-        print("System error...")
-        traceback.print_exc(file=sys.stdout) #Prints out traceback error
-        print('************************************')
-        print("")
-        sleep(1)
-        print("RESTARTING")
-        sleep(3) """
-#Client auto restarter, disabled by default due to binding issues
+    """ except: # (not KeyboardInterrupt):
+            print('************************************')
+            print("System error...")
+            traceback.print_exc(file=sys.stdout) #Prints out traceback error
+            print('************************************')
+            print("")
+            sleep(1)
+            print("RESTARTING")
+            sleep(3) """
+    #Client auto restarter, disabled by default due to binding issues

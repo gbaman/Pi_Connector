@@ -9,6 +9,15 @@ import threading
 import hashlib
 import random
 from logging import debug, info, warning, basicConfig, INFO, DEBUG, WARNING
+try:
+    from Crypto.PublicKey import RSA
+    from Crypto import Random
+    import base64
+    crypt = False
+except:
+    print("Error!!! PyCrypto library is not installed")
+    print("Encryption on network communications has been disabled")
+    crypt = False
 
 basicConfig(level=WARNING)
 
@@ -70,8 +79,21 @@ if (data[0] == "FeatureList"):
 
 
 class clientMenu(threading.Thread): #Class that controls menu drawing for textclient
+    """
+    Class that builds the dynamic menus
+    """
 
     def __init__(self, ip, level, menuOpt = "Main", clientList = ""):
+        """
+
+        :param ip: IP address of the client the menu is to be sent to
+        :param level: Permission level of the client
+        :param menuOpt: The menu that has been requested to be built, options are Main and Home.
+        :param clientList: The list of Raspberry Pis connected to the server
+        :return: None
+
+        Includes all the predefined permission levels
+        """
         super(clientMenu, self).__init__()
         self.menu =[]
         self.ipMenu = []
@@ -129,6 +151,13 @@ class clientMenu(threading.Thread): #Class that controls menu drawing for textcl
 
 # Menu drawing - (Reserved, String, IP, Response?, Response_Command, Token?, Secondary_response, Local, Reserved)
     def mainBuild(self, level): # Builds the client menu
+        """
+
+        :param level: Permission level of the user
+        :return: Built menu
+
+        This builds the client menu
+        """
         debug("Level is " + str(level))
 
         if self.shutdown <= level:
@@ -639,7 +668,7 @@ def randomDigits(digits):
     lower = 10**(digits-1)
     upper = 10**digits - 1
     toreturn = random.randint(lower, upper) #Generates a random number for the hash
-    info("Hash generated is " + str(toreturn))
+    info("Salt generated is " + str(toreturn))
     return toreturn
 
 
@@ -692,6 +721,26 @@ def checkToken(token):
     else:
         return 0
 
+def generateKeys():
+    if crypt:
+        random_generator = Random.new().read
+        mainKey = RSA.generate(1024, random_generator)
+        return mainKey
+    else:
+        return False
+
+def decryptMessage(data):
+    global mainKeys
+    if (crypt == True) and (data[0] == "Encrypted"):
+        data = data[1]
+        debug("The data before base64Decode is " + str(data))
+        data[1] = base64.b64decode(data[1])
+        debug("After base64 decide is " + str(data))
+        data[1] = mainKeys.decrypt(data[1],)
+        data[1] = json.loads(data[1])
+        debug("After final key decoding is " + str(data))
+        return data
+    return data
 
 
 
@@ -702,6 +751,7 @@ def checkPermission(ID, Required): #Future implementation
     pass
 
 def datachecker2(sql, sqlc): #Main overarching main thread communication interpreter
+    global mainKeys
     info('')
     info('Waiting for incoming messages')
     s.settimeout(10) #Time to wait before going onto next function
@@ -711,6 +761,7 @@ def datachecker2(sql, sqlc): #Main overarching main thread communication interpr
         data = client.recv(size)
         if data:
             data = json.loads(data) #Convert data from a json object to a list
+            data = decryptMessage(data)
             if (data[0] == 'Register'): #If data is register, the command for setting up a new pi
                 debug(data)
                 ip = (address[0],)
@@ -730,6 +781,14 @@ def datachecker2(sql, sqlc): #Main overarching main thread communication interpr
                     info('')
                 client.send(json.dumps(('Accept',))) #Alert the pi that it has been added
                 sleep(0.05)
+
+            elif data[0] == "PrivateKey":
+                if crypt:
+                    debug(str(mainKeys.exportKey()))
+                    debug(str(json.dumps(('UsingEncryption', mainKeys.exportKey()))))
+                    client.send(json.dumps(('EncryptionKey', mainKeys.exportKey())))
+                else:
+                    client.send(json.dumps(('EncryptionKey', "False")))
 
             elif data[0] == "Token": #Request for token from the client
                 credentials = data[1]
@@ -825,41 +884,42 @@ def consoleMessage():
 
 #**********************************************************- Main program - **********************************************************
 
+if __name__ == '__main__':
+    mainLoop = True
+    while mainLoop:
+        try:
 
-mainLoop = True
-while mainLoop:
-    try:
+            size = 1024
+            s = setupNetworking() #Create network object
+            clientlist = []
+            sql = sqlite3.connect('Pi-control.db') #Connect to database
+            sqlc = InitalSQL(sql) #Create SQL curser
+            mainKeys = generateKeys()
 
-        size = 1024
-        s = setupNetworking() #Create network object
-        clientlist = []
-        sql = sqlite3.connect('Pi-control.db') #Connect to database
-        sqlc = InitalSQL(sql) #Create SQL curser
+            p = ping()
+            p.daemon = True
+            p.start() #Starts the pinger thread
 
-        p = ping()
-        p.daemon = True
-        p.start() #Starts the pinger thread
+            c = console()
+            c.daemon = True
+            c.start() #Starts the console thread
 
-        c = console()
-        c.daemon = True
-        c.start() #Starts the console thread
+            #consoleMessage()
 
-        #consoleMessage()
+            b = broadcaster()
+            b.daemon = True
+            b.start() #Starts the broadcasting thread
 
-        b = broadcaster()
-        b.daemon = True
-        b.start() #Starts the broadcasting thread
-
-        while 1:
-            datachecker2(sql,sqlc)
+            while 1:
+                datachecker2(sql,sqlc)
 
 
 
-    except:
-        print('************************************')
-        print("System error...")
-        traceback.print_exc(file=sys.stdout) #Prints out traceback error
-        print('************************************')
-        print("")
-        break
+        except:
+            print('************************************')
+            print("System error...")
+            traceback.print_exc(file=sys.stdout) #Prints out traceback error
+            print('************************************')
+            print("")
+            break
 
